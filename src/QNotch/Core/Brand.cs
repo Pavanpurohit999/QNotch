@@ -16,7 +16,10 @@ internal static class Brand
 
     public static bool UpdatesConfigured => UpdateRepository.Length > 0;
 
-    public static string UpdateApi => UpdatesConfigured
-        ? "https://api.github.com/repos/" + UpdateRepository["https://github.com/".Length..] + "/releases/latest"
+    public static string UpdateApi => UpdateApiFor(UpdateRepository);
+
+    /// <summary>The GitHub "latest release" API address for a feed repository, or empty when there is no feed.</summary>
+    public static string UpdateApiFor(string repository) => repository.StartsWith("https://github.com/", StringComparison.Ordinal)
+        ? "https://api.github.com/repos/" + repository["https://github.com/".Length..] + "/releases/latest"
         : "";
 }

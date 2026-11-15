@@ -18,6 +18,10 @@ Environment.SetEnvironmentVariable("QNOTCH_DATA_DIR", settingsDirectory);
 var current = new Version(0, 4, 0, 0);
 var previous = new Version(0, 3, 0, 0);
 var exe = File.ReadAllBytes(Environment.ProcessPath!);
+// Orbit Desk ships with no update feed (Brand.UpdateRepository is empty). These checks exercise the real
+// validation against a placeholder feed, the way it behaves once Brand.UpdateRepository names the fork's repository.
+const string Feed = "https://github.com/example/orbit-desk";
+static UpdateRelease? Read(string json, Version installed, bool selfContained) => UpdateRelease.Read(json, installed, selfContained, Feed);
 var failures = 0;
 var checks = 0;
 await Test("normalizes versions and rejects preview tags", () =>
@@ -29,12 +33,12 @@ await Test("normalizes versions and rejects preview tags", () =>
 });
 await Test("new stable release selects the installed variant", () =>
 {
-    Assert(UpdateRelease.Read(ReleaseJson(exe), previous, false) is { IsZip: false, Version: var v } && v == current);
-    Assert(UpdateRelease.Read(ReleaseJson(exe, zip: true), previous, true) is { IsZip: true });
-    Assert(UpdateRelease.Read(ReleaseJson(exe), current, false) is null);
-    Assert(UpdateRelease.Read(ReleaseJson(exe), new Version(1, 0, 0, 0), false) is null);
-    Assert(UpdateRelease.Read(ReleaseJson(exe, draft: true), previous, false) is null);
-    Assert(UpdateRelease.Read(ReleaseJson(exe, preview: true), previous, false) is null);
+    Assert(Read(ReleaseJson(exe), previous, false) is { IsZip: false, Version: var v } && v == current);
+    Assert(Read(ReleaseJson(exe, zip: true), previous, true) is { IsZip: true });
+    Assert(Read(ReleaseJson(exe), current, false) is null);
+    Assert(Read(ReleaseJson(exe), new Version(1, 0, 0, 0), false) is null);
+    Assert(Read(ReleaseJson(exe, draft: true), previous, false) is null);
+    Assert(Read(ReleaseJson(exe, preview: true), previous, false) is null);
     return Task.CompletedTask;
 });
 await Test("Mac channel tags never become Windows updates, even at a higher version", () =>
@@ -45,8 +49,8 @@ await Test("Mac channel tags never become Windows updates, even at a higher vers
         if (fixture.GetProperty("platform").GetString() != "macos") continue;
         var tag = fixture.GetProperty("tag").GetString()!;
         var json = ReleaseJson(exe, tag: tag, assetName: "QNotch-macos-arm64.dmg");
-        Assert(UpdateRelease.Read(json, previous, false) is null);
-        Assert(UpdateRelease.Read(json, previous, true) is null);
+        Assert(Read(json, previous, false) is null);
+        Assert(Read(json, previous, true) is null);
     }
     return Task.CompletedTask;
 });
@@ -58,38 +62,45 @@ await Test("Mac assets do not change selection of either legacy Windows variant"
         var assets = root["assets"]!.AsArray();
         var mac = assets[0]!.DeepClone();
         mac["name"] = "QNotch-macos-arm64.dmg";
-        mac["browser_download_url"] = $"{UpdateRelease.Repository}/releases/download/v0.4.0/QNotch-macos-arm64.dmg";
+        mac["browser_download_url"] = $"{Feed}/releases/download/v0.4.0/QNotch-macos-arm64.dmg";
         assets.Insert(0, mac);
-        Assert(UpdateRelease.Read(root.ToJsonString(), previous, zip) is { } update && update.IsZip == zip);
+        Assert(Read(root.ToJsonString(), previous, zip) is { } update && update.IsZip == zip);
     }
     return Task.CompletedTask;
 });
 await Test("Windows-style tags with only Mac downloads still fail closed", async () =>
 {
     var json = ReleaseJson(exe, assetName: "QNotch-macos-arm64.dmg");
-    await Reject(() => Task.FromResult(UpdateRelease.Read(json, previous, false)));
-    await Reject(() => Task.FromResult(UpdateRelease.Read(json, previous, true)));
+    await Reject(() => Task.FromResult(Read(json, previous, false)));
+    await Reject(() => Task.FromResult(Read(json, previous, true)));
 });
 await Test("rejects missing assets, foreign URLs and missing checksums", async () =>
 {
-    await Reject(() => Task.FromResult(UpdateRelease.Read(ReleaseJson(exe, zip: true), previous, false)));
-    await Reject(() => Task.FromResult(UpdateRelease.Read(ReleaseJson(exe, url: "https://example.com/QNotch.exe"), previous, false)));
-    await Reject(() => Task.FromResult(UpdateRelease.Read(ReleaseJson(exe, digest: ""), previous, false)));
+    await Reject(() => Task.FromResult(Read(ReleaseJson(exe, zip: true), previous, false)));
+    await Reject(() => Task.FromResult(Read(ReleaseJson(exe, url: "https://example.com/QNotch.exe"), previous, false)));
+    await Reject(() => Task.FromResult(Read(ReleaseJson(exe, digest: ""), previous, false)));
 });
 await Test("checks the fixed GitHub endpoint and handles no releases", async () =>
 {
     using var http = new HttpClient(new FakeHandler(request =>
     {
-        Assert(request.RequestUri!.AbsoluteUri == "https://api.github.com/repos/Somafet/qnotch/releases/latest");
+        Assert(request.RequestUri!.AbsoluteUri == "https://api.github.com/repos/example/orbit-desk/releases/latest");
         Assert(request.Headers.UserAgent.ToString().StartsWith("QNotch/"));
         return new HttpResponseMessage(HttpStatusCode.NotFound);
     }));
-    Assert(await new UpdateClient(http).CheckAsync(previous, false, default) is null);
+    Assert(await new UpdateClient(http, Feed).CheckAsync(previous, false, default) is null);
+});
+await Test("with no feed configured, nothing is requested and no release is accepted", async () =>
+{
+    using var http = new HttpClient(new FakeHandler(_ => throw new Exception("No request may be sent without a feed.")));
+    Assert(await new UpdateClient(http, "").CheckAsync(previous, false, default) is null);
+    if (!Brand.UpdatesConfigured) Assert(await new UpdateClient(http).CheckAsync(previous, false, default) is null);
+    await Reject(() => Task.FromResult(UpdateRelease.Read(ReleaseJson(exe), previous, false, "")));
 });
 await Test("reports GitHub rate limiting", async () =>
 {
     using var http = new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)));
-    await Reject(() => new UpdateClient(http).CheckAsync(previous, false, default));
+    await Reject(() => new UpdateClient(http, Feed).CheckAsync(previous, false, default));
 });
 await Test("verifies a valid exe download", () => InDirectory(async dir =>
 {
@@ -185,7 +196,7 @@ await Test("update notifications remain suppressed for the same version after re
     var store = new SettingsStore();
     HttpClient Client() => new(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         { Content = new StringContent(ReleaseJson(exe, tag: "v0.5.0")) }));
-    using var updates = new UpdateService(settings, Dispatcher.CurrentDispatcher, store, () => { }, Client());
+    using var updates = new UpdateService(settings, Dispatcher.CurrentDispatcher, store, () => { }, Client(), Feed);
     var events = 0;
     updates.UpdateAvailable += () => events++;
     await updates.CheckAsync(true);
@@ -195,7 +206,7 @@ await Test("update notifications remain suppressed for the same version after re
     Assert(events == 2 && !updates.ShouldNotify);
     store.Flush();
     var saved = JsonSerializer.Deserialize<GeneralSettings>(File.ReadAllText(Path.Combine(settingsDirectory, "general.json")), SettingsStore.Json)!;
-    using var restarted = new UpdateService(saved, Dispatcher.CurrentDispatcher, new SettingsStore(), () => { }, Client());
+    using var restarted = new UpdateService(saved, Dispatcher.CurrentDispatcher, new SettingsStore(), () => { }, Client(), Feed);
     await restarted.CheckAsync(true);
     Assert(!restarted.ShouldNotify);
 });
@@ -210,7 +221,7 @@ await Test("turning checks off cancels an in-flight automatic check", async () =
         await Task.Delay(Timeout.Infinite, cancellation);
         return new HttpResponseMessage(HttpStatusCode.OK);
     }));
-    using var updates = new UpdateService(settings, Dispatcher.CurrentDispatcher, store, () => { }, http);
+    using var updates = new UpdateService(settings, Dispatcher.CurrentDispatcher, store, () => { }, http, Feed);
     var check = updates.CheckAsync(true);
     await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
     updates.ChooseAutomaticChecks(false);
@@ -222,7 +233,7 @@ await Test("turning checks off cancels an in-flight automatic check", async () =
 if (args.Contains("--live")) await Test("reads both actual GitHub release variants", async () =>
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-    var client = new UpdateClient(http);
+    var client = new UpdateClient(http); // the shipped feed (Brand.UpdateRepository)
     Assert(await client.CheckAsync(new Version(0, 0, 0, 0), false, default) is { IsZip: false });
     Assert(await client.CheckAsync(new Version(0, 0, 0, 0), true, default) is { IsZip: true });
 });
@@ -314,7 +325,7 @@ static string ReleaseJson(byte[] bytes, bool zip = false, bool draft = false, bo
     {
         tag_name = tag, draft, prerelease = preview,
         assets = new[] { new { name, state = "uploaded", size = size ?? bytes.Length,
-            browser_download_url = url ?? $"{UpdateRelease.Repository}/releases/download/{tag}/{name}",
+            browser_download_url = url ?? $"{Feed}/releases/download/{tag}/{name}",
             digest = "sha256:" + (digest ?? Convert.ToHexString(SHA256.HashData(bytes))) } },
     });
 }
@@ -326,8 +337,8 @@ async Task Download(byte[] bytes, string dir, bool zip = false, string? digest =
         content.Headers.ContentLength = expectedSize ?? bytes.Length;
         return new HttpResponseMessage(HttpStatusCode.OK) { Content = content, RequestMessage = request };
     }));
-    var release = UpdateRelease.Read(ReleaseJson(bytes, zip, digest: digest, size: expectedSize, tag: tag), previous, zip)!;
-    await new UpdateClient(http).DownloadAsync(release, dir, null, cancellation);
+    var release = Read(ReleaseJson(bytes, zip, digest: digest, size: expectedSize, tag: tag), previous, zip)!;
+    await new UpdateClient(http, Feed).DownloadAsync(release, dir, null, cancellation);
 }
 static byte[] Zip(byte[] bytes, string name = "QNotch.exe", bool extraFile = false)
 {

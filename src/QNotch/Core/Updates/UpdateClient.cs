@@ -6,12 +6,16 @@ using System.Security.Cryptography;
 
 namespace QNotch.Core.Updates;
 
-internal sealed class UpdateClient(HttpClient http)
+/// <param name="repository">The release feed; defaults to <see cref="Brand.UpdateRepository"/>. Empty means no checks.</param>
+internal sealed class UpdateClient(HttpClient http, string? repository = null)
 {
+    readonly string _repository = repository ?? Brand.UpdateRepository;
+
     public async Task<UpdateRelease?> CheckAsync(Version installed, bool selfContained, CancellationToken cancellation)
     {
-        if (!Brand.UpdatesConfigured) return null; // no update feed of our own yet: never fall back to upstream QNotch releases
-        using var request = new HttpRequestMessage(HttpMethod.Get, Brand.UpdateApi);
+        var api = Brand.UpdateApiFor(_repository);
+        if (api.Length == 0) return null; // no update feed of our own yet: never fall back to upstream QNotch releases
+        using var request = new HttpRequestMessage(HttpMethod.Get, api);
         request.Headers.UserAgent.ParseAdd($"QNotch/{installed}");
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
@@ -21,7 +25,7 @@ internal sealed class UpdateClient(HttpClient http)
             throw new HttpRequestException("GitHub is limiting update checks. Try again later.");
         response.EnsureSuccessStatusCode();
         await response.Content.LoadIntoBufferAsync(1_048_576, cancellation).ConfigureAwait(false);
-        return UpdateRelease.Read(await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false), installed, selfContained);
+        return UpdateRelease.Read(await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false), installed, selfContained, _repository);
     }
 
     /// <summary>Download and verify on a worker thread, without touching the installed executable.</summary>

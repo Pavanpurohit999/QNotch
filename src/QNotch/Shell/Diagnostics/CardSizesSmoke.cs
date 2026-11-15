@@ -64,8 +64,10 @@ internal sealed partial class SmokeTest
                         range.SetValue((int)size);
                     }
                     W.RootElement.UpdateLayout();
-                    if (Math.Abs(host.ActualWidth - ((int)size * (HomeView.Unit + HomeView.Gap) - HomeView.Gap)) > 0.1
-                        || Math.Abs(host.ActualHeight - HomeView.RowHeight) > 0.1) return $"{card.Id} has wrong {size} dimensions";
+                    // Layout rounding snaps to whole device pixels, so allow one pixel at this monitor's scale (0.8 DIP at 125%).
+                    var pixel = 1 / W.Scale + 0.01;
+                    if (Math.Abs(host.ActualWidth - ((int)size * (HomeView.Unit + HomeView.Gap) - HomeView.Gap)) > pixel
+                        || Math.Abs(host.ActualHeight - HomeView.RowHeight) > pixel) return $"{card.Id} has wrong {size} dimensions ({host.ActualWidth:0.###} x {host.ActualHeight:0.###}, expected {(int)size * (HomeView.Unit + HomeView.Gap) - HomeView.Gap} x {HomeView.RowHeight})";
                     if (!ReferenceEquals(host.Content, bodies[card.Id])) return $"resizing {card.Id} recreated its body";
                     if (saved is null) return "no general settings were saved";
                     var reloaded = new CardLayout(_h.Cards, JsonSerializer.Deserialize<GeneralSettings>(saved, SettingsStore.Json)!);

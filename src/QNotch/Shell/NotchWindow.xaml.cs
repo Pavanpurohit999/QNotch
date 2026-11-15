@@ -24,7 +24,7 @@ public partial class NotchWindow : Window
 
     nint _hwnd, _prevForeground;
     HwndSource _src = null!;
-    bool _kb, _gameBar, _pillDirty, _pillExact;
+    bool _kb, _gameBar, _pillDirty, _pillExact, _pillPending;
     int _monitorIndex;
     double _offX, _offY, _gameH = 22, _gameOpacity = 0.7, _shift, _notchX;
     MonitorInfo _mon = new(0, default, true, 1);
@@ -277,7 +277,9 @@ public partial class NotchWindow : Window
     double MeasurePill()
     {
         PillLayer.Measure(new Size(double.PositiveInfinity, PillH));
-        return Math.Ceiling(PillLayer.DesiredSize.Width / 4) * 4 + 2;
+        // Never wider than the window: with every segment showing (media, update, capture, agents, timer, weather, stats)
+        // the content can exceed it, and the pill would be cut off by the window or spill past a monitor edge when nudged.
+        return Math.Min(Math.Ceiling(PillLayer.DesiredSize.Width / 4) * 4 + 2, WinW - 2);
     }
 
     /// <summary>Call once after the DataContext is set.</summary>
@@ -297,7 +299,9 @@ public partial class NotchWindow : Window
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
             _pillDirty = false;
-            if (_gameBar || _open > 0 || _animating) return;
+            if (_gameBar) return;
+            // The panel is open or animating: measure once it has closed (Finish), or the collapsed pill keeps a stale width.
+            if (_open > 0 || _animating) { _pillPending = true; return; }
             var w = MeasurePill();
             if (w > _pillW || w < _pillW - 24 || (_pillExact && w != _pillW)) { _pillW = w; SetCollapsedWidth(w, true); }
             _pillExact = false;
@@ -424,7 +428,8 @@ public partial class NotchWindow : Window
             PanelLayer.Visibility = Visibility.Collapsed;
             PillLayer.Opacity = 1;
             Surface.Width = _pillW;
-            if (PeekStrip.Visibility == Visibility.Visible) InvalidatePill(); // a peek that began during the close: re-measure was skipped
+            // A re-measure skipped while open or animating (segments changed, or a peek began during the close).
+            if (_pillPending || PeekStrip.Visibility == Visibility.Visible) { _pillPending = false; InvalidatePill(); }
         }
         else
         {

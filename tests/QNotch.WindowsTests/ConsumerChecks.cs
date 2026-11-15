@@ -208,7 +208,7 @@ internal static class ConsumerChecks
 
     static async Task CliProcesses()
     {
-        var exe = Path.Combine(Path.GetDirectoryName(typeof(ConsumerCli).Assembly.Location)!, "QNotch.exe");
+        var exe = Path.ChangeExtension(typeof(ConsumerCli).Assembly.Location, ".exe");
         Check(File.Exists(exe), "CLI apphost copied to test output");
         var instance = "consumer-process-" + Guid.NewGuid().ToString("N");
         async Task<(int Code, string Out, string Error)> Run(string[] args)

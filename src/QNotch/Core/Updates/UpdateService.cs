@@ -15,6 +15,7 @@ internal sealed class UpdateService : IDisposable
     readonly bool _readOnly;
     readonly Action _shutdown;
     readonly HttpClient _http;
+    readonly string? _repository;
     readonly Timer _timer;
     readonly CancellationTokenSource _lifetime = new();
     readonly Version _installed;
@@ -31,8 +32,9 @@ internal sealed class UpdateService : IDisposable
     public bool ShouldNotify => State.HasUpdate && _settings.LastNotifiedUpdateVersion != State.AvailableVersion;
     string ResultFile => Path.Combine(Paths.DataDir, "update-result.txt");
 
-    public UpdateService(GeneralSettings settings, Dispatcher dispatcher, SettingsStore store, Action shutdown, HttpClient? http = null)
+    public UpdateService(GeneralSettings settings, Dispatcher dispatcher, SettingsStore store, Action shutdown, HttpClient? http = null, string? repository = null)
     {
+        _repository = repository;
         _settings = settings; _dispatcher = dispatcher; _store = store; _readOnly = store.ReadOnly; _shutdown = shutdown;
         _http = http ?? new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
         // Introduce the default once for older settings as well. A recorded choice is never overridden.
@@ -133,7 +135,7 @@ internal sealed class UpdateService : IDisposable
         _operation = cancellation;
         try
         {
-            var client = new UpdateClient(_http);
+            var client = new UpdateClient(_http, _repository);
             var release = await Task.Run(() => client.CheckAsync(_installed, _selfContained, cancellation.Token));
             cancellation.Token.ThrowIfCancellationRequested();
             _release = release;
@@ -179,7 +181,7 @@ internal sealed class UpdateService : IDisposable
             await Task.Run(async () =>
             {
                 Directory.CreateDirectory(directory);
-                await new UpdateClient(_http).DownloadAsync(release, directory, progress, cancellation.Token);
+                await new UpdateClient(_http, _repository).DownloadAsync(release, directory, progress, cancellation.Token);
                 using var resource = typeof(UpdateService).Assembly.GetManifestResourceStream("QNotch.Core.Updates.ApplyUpdate.ps1")
                     ?? throw new IOException("The update helper is missing.");
                 await using var file = File.Create(Path.Combine(directory, "apply.ps1"));

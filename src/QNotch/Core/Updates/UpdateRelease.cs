@@ -16,8 +16,11 @@ internal sealed record UpdateRelease(Version Version, string Tag, Uri Download, 
             ? new Version(v.Major, v.Minor, Math.Max(0, v.Build), Math.Max(0, v.Revision)) : null;
     }
 
-    public static UpdateRelease? Read(string json, Version installed, bool selfContained)
+    /// <param name="repository">The feed the download must come from; defaults to <see cref="Brand.UpdateRepository"/>.</param>
+    public static UpdateRelease? Read(string json, Version installed, bool selfContained, string? repository = null)
     {
+        repository ??= Repository;
+        if (repository.Length == 0) throw new InvalidDataException("No update feed is configured.");
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
         if (root.GetProperty("draft").GetBoolean() || root.GetProperty("prerelease").GetBoolean()) return null;
@@ -28,7 +31,7 @@ internal sealed record UpdateRelease(Version Version, string Tag, Uri Download, 
         foreach (var asset in root.GetProperty("assets").EnumerateArray())
         {
             if (asset.GetProperty("name").GetString() != name || asset.GetProperty("state").GetString() != "uploaded") continue;
-            var expected = $"{Repository}/releases/download/{Uri.EscapeDataString(tag)}/{name}";
+            var expected = $"{repository}/releases/download/{Uri.EscapeDataString(tag)}/{name}";
             if (!Uri.TryCreate(asset.GetProperty("browser_download_url").GetString(), UriKind.Absolute, out var url)
                 || !string.Equals(url.AbsoluteUri, expected, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("The release download is not from the QNotch repository.");
