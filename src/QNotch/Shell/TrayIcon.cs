@@ -110,7 +110,7 @@ public sealed unsafe class TrayIcon : IDisposable
             m.Items.Add(it);
         }
         m.Items.Add(new Separator());
-        m.Items.Add(Item("Quit QNotch", () => { QNotch.Core.Analytics.Track("shell", "quit", "tray"); _exit(); }));
+        m.Items.Add(Item("Quit Orbit Desk", () => { QNotch.Core.Analytics.Track("shell", "quit", "tray"); _exit(); }));
         // Keep keyboard focus if "Open panel" was chosen, so Esc and an outside click dismiss the panel.
         m.Closed += (_, _) => { if (_shell.Mode != ShellMode.Expanded) _w.DisableKeyboard(); };
         m.IsOpen = true;

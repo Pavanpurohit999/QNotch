@@ -47,7 +47,7 @@ internal sealed class UpdateService : IDisposable
         {
             CurrentVersion = UpdateRelease.DisplayVersion(_installed),
             NeedsPreferenceChoice = !settings.UpdateChecksChoiceMade,
-            Status = settings.CheckForUpdates ? "Automatic checks are on. QNotch will check shortly after startup."
+            Status = settings.CheckForUpdates ? $"Automatic checks are on. {Brand.ProductName} will check shortly after startup."
                 : "Automatic checks are off. You can check manually at any time.",
         };
         _timer = new Timer(_ =>
@@ -59,7 +59,7 @@ internal sealed class UpdateService : IDisposable
         {
             // Windows owns the package folder and the Store installs updates: no GitHub checks, no choice to ask for.
             State.NeedsPreferenceChoice = false;
-            State.Status = "The Microsoft Store keeps this copy of QNotch up to date.";
+            State.Status = $"The Microsoft Store keeps this copy of {Brand.ProductName} up to date.";
             return;
         }
         if (_readOnly)
@@ -67,7 +67,10 @@ internal sealed class UpdateService : IDisposable
             settings.CheckForUpdates = true;
             State.NeedsPreferenceChoice = true;
             State.AvailableVersion = "0.5.0";
-            State.Status = "A new version is ready. QNotch will restart after you choose Update and restart.";
+            // Demo release with no name, notes or date: shows the fallbacks the real page uses.
+            var demo = new UpdateRelease(new Version(0, 5, 0, 0), "v0.5.0", new Uri("https://github.com/"), 1, "", false);
+            State.ReleaseDetails = $"{demo.Title} · {demo.PublishedText}\n{demo.NotesText}";
+            State.Status = $"A new version is ready. {Brand.ProductName} will restart after you choose Update and restart.";
             return;
         }
         try
@@ -140,8 +143,10 @@ internal sealed class UpdateService : IDisposable
             cancellation.Token.ThrowIfCancellationRequested();
             _release = release;
             State.AvailableVersion = release is null ? "" : UpdateRelease.DisplayVersion(release.Version);
-            State.Status = release is null ? $"You're up to date. Checked at {DateTime.Now:HH:mm}."
-                : "A new version is ready. QNotch will restart after you choose Update and restart.";
+            State.ReleaseDetails = release is null ? "" : $"{release.Title} · {release.PublishedText}\n{Excerpt(release.NotesText)}";
+            State.Status = release is not null ? $"A new version is ready. {Brand.ProductName} will restart after you choose Update and restart."
+                : client.NoReleasesPublished ? $"No releases published yet. Checked at {DateTime.Now:HH:mm}."
+                : $"You're up to date. Checked at {DateTime.Now:HH:mm}.";
             if (release is not null) UpdateAvailable?.Invoke();
         }
         catch (OperationCanceledException)
@@ -152,7 +157,8 @@ internal sealed class UpdateService : IDisposable
         catch (Exception ex)
         {
             Log.Warn("Checking for QNotch updates failed", ex);
-            State.Status = "Could not check for updates. " + ex.Message;
+            State.Status = "Could not check for updates. " + (ex is HttpRequestException { StatusCode: null } && ex.InnerException is not null
+                ? "GitHub could not be reached. Check your connection and try again." : ex.Message);
         }
         finally
         {
@@ -188,7 +194,7 @@ internal sealed class UpdateService : IDisposable
                 await resource.CopyToAsync(file, cancellation.Token);
             });
             State.IsDownloading = false;
-            State.Status = "Restarting QNotch to install the update…";
+            State.Status = $"Restarting {Brand.ProductName} to install the update…";
             await StartHelperAsync(target, directory, release.Tag, cancellation.Token);
             handedOff = true;
             _shutdown(); // OnExit flushes settings and releases the single-instance mutex.
@@ -200,7 +206,7 @@ internal sealed class UpdateService : IDisposable
         catch (UnauthorizedAccessException ex)
         {
             Log.Warn("The QNotch install folder is not writable", ex);
-            State.Status = "Could not write to the install folder. Move QNotch to a folder you can write to, then try again.";
+            State.Status = $"Could not write to the install folder. Move {Brand.ProductName} to a folder you can write to, then try again.";
         }
         catch (Exception ex)
         {
@@ -259,5 +265,12 @@ internal sealed class UpdateService : IDisposable
         _timer.Dispose();
         _lifetime.Cancel();
         _http.Dispose();
+    }
+
+    /// <summary>The first lines of the release notes for the Updates page (the full notes are on GitHub).</summary>
+    static string Excerpt(string notes)
+    {
+        var text = notes.Replace("\r", "").Trim();
+        return text.Length <= 280 ? text : text[..280].TrimEnd() + "…";
     }
 }

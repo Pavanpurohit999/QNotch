@@ -11,6 +11,9 @@ internal sealed class UpdateClient(HttpClient http, string? repository = null)
 {
     readonly string _repository = repository ?? Brand.UpdateRepository;
 
+    /// <summary>True after a check found the repository but no published release (an empty feed, not an error).</summary>
+    public bool NoReleasesPublished { get; private set; }
+
     public async Task<UpdateRelease?> CheckAsync(Version installed, bool selfContained, CancellationToken cancellation)
     {
         var api = Brand.UpdateApiFor(_repository);
@@ -20,7 +23,17 @@ internal sealed class UpdateClient(HttpClient http, string? repository = null)
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation).ConfigureAwait(false);
-        if (response.StatusCode == HttpStatusCode.NotFound) return null; // no published releases yet
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            // releases/latest is 404 both for a repository without releases and for one that does not exist: ask which.
+            using var repo = new HttpRequestMessage(HttpMethod.Get, api[..^"/releases/latest".Length]);
+            repo.Headers.UserAgent.ParseAdd($"QNotch/{installed}");
+            repo.Headers.Accept.ParseAdd("application/vnd.github+json");
+            using var found = await http.SendAsync(repo, HttpCompletionOption.ResponseHeadersRead, cancellation).ConfigureAwait(false);
+            if (found.StatusCode == HttpStatusCode.NotFound) throw new HttpRequestException("The update repository was not found on GitHub.");
+            NoReleasesPublished = true;
+            return null;
+        }
         if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
             throw new HttpRequestException("GitHub is limiting update checks. Try again later.");
         response.EnsureSuccessStatusCode();
@@ -68,7 +81,7 @@ internal sealed class UpdateClient(HttpClient http, string? repository = null)
             // The release workflow packages a single exe. Never extract arbitrary paths from a downloaded archive.
             if (zip.Entries.Count != 1 || zip.Entries[0].FullName != "QNotch.exe"
                 || zip.Entries[0].Length is <= 0 or > UpdateRelease.MaxDownloadSize)
-                throw new InvalidDataException("The update archive is not a QNotch package.");
+                throw new InvalidDataException($"The update archive is not a {Brand.ProductName} package.");
             zip.Entries[0].ExtractToFile(exe);
         }
         else File.Move(download, exe);

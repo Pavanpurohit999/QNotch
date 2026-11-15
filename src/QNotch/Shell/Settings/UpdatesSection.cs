@@ -21,7 +21,7 @@ internal static class UpdatesSection
         choice.Children.Add(UiKit.Text("Keep automatic update checks enabled?", "Title"));
         choice.Children.Add(new TextBlock
         {
-            Text = "QNotch checks GitHub for new versions automatically. You decide when to install each update. You can change this preference below at any time.",
+            Text = Brand.ProductName + " checks GitHub for new versions automatically. You decide when to install each update. You can change this preference below at any time.",
             Style = (Style)Application.Current.FindResource("Muted"), TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 8, 0, 12),
         });
@@ -72,13 +72,18 @@ internal static class UpdatesSection
         notes.Click += (_, _) =>
         { QNotch.Core.Analytics.Track("shell", "open_release_notes");
             try { Process.Start(new ProcessStartInfo(UpdateRelease.Repository + "/releases") { UseShellExecute = true }); }
-            catch (Exception ex) { Log.Warn("Opening the QNotch releases page failed", ex); }
+            catch (Exception ex) { Log.Warn("Opening the releases page failed", ex); }
         };
         rows.Add(UiKit.SettingsRow("Release notes", null, notes));
         var group = UiKit.SettingsGroup(rows, title: "Updates");
         group.Children.Insert(1, UiKit.BindVisible(choice, updates.State, nameof(UpdateState.NeedsPreferenceChoice)));
         var available = new StackPanel();
         available.Children.Add(row);
+        // Release name, date and a notes excerpt; UpdateRelease supplies the fallbacks, so this never reads "null".
+        var details = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(16, 0, 16, 10), Style = (Style)Application.Current.FindResource("Muted") };
+        AutomationProperties.SetAutomationId(details, "updates-release-details");
+        UiKit.Bind(details, TextBlock.TextProperty, updates.State, nameof(UpdateState.ReleaseDetails));
+        available.Children.Add(details);
         available.Children.Add(UiKit.BindVisible(progress, updates.State, nameof(UpdateState.IsDownloading)));
         group.Children.Add(UiKit.BindVisible(available, updates.State, nameof(UpdateState.HasUpdate)));
         return group;
@@ -91,7 +96,7 @@ internal static class UpdatesSection
         AutomationProperties.SetAutomationId(store, "updates-store");
         store.Click += (_, _) => Open(AppPackage.StoreLink, "the Microsoft Store page");
         var notes = new Button { Content = "Open GitHub" };
-        notes.Click += (_, _) => { Analytics.Track("shell", "open_release_notes"); Open(UpdateRelease.Repository + "/releases", "the QNotch releases page"); };
+        notes.Click += (_, _) => { Analytics.Track("shell", "open_release_notes"); Open(UpdateRelease.Repository + "/releases", $"the {Brand.ProductName} releases page"); };
         return UiKit.SettingsGroup([
             UiKit.SettingsRow("Updates", updates.State.Status, store),
             UiKit.SettingsRow("Release notes", null, notes),

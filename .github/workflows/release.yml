@@ -15,7 +15,8 @@ concurrency:
 
 jobs:
   release:
-    if: github.repository == 'Somafet/qnotch'
+    # Orbit Desk publishes only from its own repository; upstream QNotch's channels below stay gated to Somafet/qnotch.
+    if: github.repository == 'Pavanpurohit999/QNotch'
     runs-on: windows-latest
     timeout-minutes: 25
     permissions:
@@ -62,6 +63,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet publish src/QNotch/QNotch.csproj -p:PublishProfile=win-x64-self-contained -p:Version=$env:RELEASE_VERSION
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # The build is OrbitDesk.exe; release assets keep the updater's names (QNotch.exe, a ZIP whose single root is QNotch.exe).
+          Copy-Item dist/OrbitDesk.exe dist/QNotch.exe -Force
+          Copy-Item dist/self-contained/OrbitDesk.exe dist/self-contained/QNotch.exe -Force
           Compress-Archive -Path dist/self-contained/QNotch.exe -DestinationPath dist/QNotch-self-contained.zip
 
       - name: Verify published runtime configurations and archive
@@ -80,12 +84,15 @@ jobs:
 
       # The Store package wraps the verified self-contained exe. It is a workflow artifact for Partner Center, never a release asset.
       - name: Build the Microsoft Store package
+        # Upstream QNotch's Store identity: never built from the Orbit Desk fork.
+        if: github.repository == 'Somafet/qnotch'
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ steps.policy.outputs.version }}
         run: ./src/QNotch/Packaging/Build-Msix.ps1 -Version $env:RELEASE_VERSION -SkipPublish
 
       - name: Keep the Microsoft Store package
+        if: github.repository == 'Somafet/qnotch'
         uses: actions/upload-artifact@v4
         with:
           name: QNotch-msix

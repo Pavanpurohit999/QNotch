@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { basename, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { maxWindowsAssetSize, releasePolicy, repository, validateAssetNames, validateLatest } from './release-policy.mjs';
+
+const releaseNotes = resolve('documentation/releases/RELEASE_NOTES.md');
 
 function gh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -83,8 +85,10 @@ export async function publishRelease({ tag, platform, paths }, run = gh) {
   } else {
     const args = ['release', 'create', tag, ...assets.map(asset => asset.path), '--repo', repository,
       '--draft', '--latest=false', `--prerelease=${policy.prerelease}`, '--verify-tag', '--generate-notes',
-      '--title', `QNotch ${platform === 'macos' ? 'macOS ' : ''}${policy.version}`];
+      '--title', `Orbit Desk ${platform === 'macos' ? 'macOS ' : ''}${policy.version}`];
     if (platform === 'windows' && latest) args.push('--notes-start-tag', latest.tag_name);
+    // Hand-written notes go first; GitHub appends the generated change list, so the body is never empty.
+    if (existsSync(releaseNotes)) args.push('--notes-file', releaseNotes);
     run(args);
   }
   verifyUploadedRelease(getTaggedRelease(run, tag), policy, assets);

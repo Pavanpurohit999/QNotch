@@ -2,7 +2,8 @@ import { appendFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 
-export const repository = 'Somafet/qnotch';
+// Orbit Desk's own release feed (fork of Somafet/qnotch). Must match Brand.UpdateRepository in src/QNotch/Core/Brand.cs.
+export const repository = 'Pavanpurohit999/QNotch';
 export const windowsAssets = ['QNotch.exe', 'QNotch-self-contained.zip'];
 export const maxWindowsAssetSize = 256 * 1024 * 1024;
 

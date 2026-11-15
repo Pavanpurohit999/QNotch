@@ -9,10 +9,10 @@ internal static class Brand
     public const string ProductName = "Orbit Desk";
 
     /// <summary>
-    /// GitHub repository (https://github.com/owner/name) whose releases feed the updater. Empty disables update checks entirely,
-    /// so the fork can never download an upstream QNotch build over itself. Set it once you publish your own releases.
+    /// GitHub repository (https://github.com/owner/name) whose releases feed the updater: Orbit Desk's own releases, never upstream
+    /// QNotch. Empty disables update checks entirely. Must match `repository` in scripts/release-policy.mjs.
     /// </summary>
-    public const string UpdateRepository = "";
+    public const string UpdateRepository = "https://github.com/Pavanpurohit999/QNotch";
 
     public static bool UpdatesConfigured => UpdateRepository.Length > 0;
 

@@ -82,13 +82,17 @@ await Test("rejects missing assets, foreign URLs and missing checksums", async (
 });
 await Test("checks the fixed GitHub endpoint and handles no releases", async () =>
 {
+    var requested = new List<string>();
     using var http = new HttpClient(new FakeHandler(request =>
     {
-        Assert(request.RequestUri!.AbsoluteUri == "https://api.github.com/repos/example/orbit-desk/releases/latest");
+        requested.Add(request.RequestUri!.AbsoluteUri);
         Assert(request.Headers.UserAgent.ToString().StartsWith("QNotch/"));
-        return new HttpResponseMessage(HttpStatusCode.NotFound);
+        // releases/latest is 404 without releases; the repository itself exists.
+        return new HttpResponseMessage(request.RequestUri.AbsoluteUri.EndsWith("/releases/latest") ? HttpStatusCode.NotFound : HttpStatusCode.OK);
     }));
-    Assert(await new UpdateClient(http, Feed).CheckAsync(previous, false, default) is null);
+    var client = new UpdateClient(http, Feed);
+    Assert(await client.CheckAsync(previous, false, default) is null && client.NoReleasesPublished);
+    Assert(requested.SequenceEqual(["https://api.github.com/repos/example/orbit-desk/releases/latest", "https://api.github.com/repos/example/orbit-desk"]));
 });
 await Test("with no feed configured, nothing is requested and no release is accepted", async () =>
 {
@@ -101,6 +105,92 @@ await Test("reports GitHub rate limiting", async () =>
 {
     using var http = new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)));
     await Reject(() => new UpdateClient(http, Feed).CheckAsync(previous, false, default));
+});
+await Test("a valid release keeps its name, notes and date", () =>
+{
+    var json = JsonNode.Parse(ReleaseJson(exe, tag: "v0.5.0"))!;
+    json["name"] = "Orbit Desk 0.5.0"; json["body"] = "Glass theme."; json["published_at"] = "2026-11-15T10:00:00Z";
+    var release = Read(json.ToJsonString(), previous, false)!;
+    Assert(release.Title == "Orbit Desk 0.5.0" && release.NotesText == "Glass theme." && release.PublishedAt == new DateTimeOffset(2026, 11, 15, 10, 0, 0, TimeSpan.Zero));
+    return Task.CompletedTask;
+});
+await Test("missing optional fields fall back to readable text, never null", () =>
+{
+    var release = Read(ReleaseJson(exe, tag: "v0.5.0"), previous, false)!; // no name, body or published_at
+    Assert(release.Title == "v0.5.0" && release.NotesText == UpdateRelease.NoNotesText && release.PublishedText == UpdateRelease.NoDateText);
+    return Task.CompletedTask;
+});
+await Test("null fields fall back too, and draft/prerelease null mean false", () =>
+{
+    var json = JsonNode.Parse(ReleaseJson(exe, tag: "v0.5.0"))!;
+    json["name"] = null; json["body"] = "null"; json["published_at"] = null; json["draft"] = null; json["prerelease"] = null;
+    var release = Read(json.ToJsonString(), previous, false)!;
+    Assert(release.Title == "v0.5.0" && release.NotesText == UpdateRelease.NoNotesText && release.PublishedText == UpdateRelease.NoDateText);
+    foreach (var text in new[] { release.Title, release.NotesText, release.PublishedText }) Assert(!text.Contains("null"));
+    return Task.CompletedTask;
+});
+await Test("empty, missing or null assets report that no download exists", async () =>
+{
+    foreach (var assets in new JsonNode?[] { new JsonArray(), null })
+    {
+        var json = JsonNode.Parse(ReleaseJson(exe, tag: "v0.5.0"))!;
+        json["assets"] = assets;
+        try { Read(json.ToJsonString(), previous, false); throw new Exception("accepted a release without assets"); }
+        catch (InvalidDataException ex) { Assert(ex.Message == UpdateRelease.NoAssetsText); }
+    }
+    var noAssets = JsonNode.Parse(ReleaseJson(exe, tag: "v0.5.0"))!.AsObject();
+    noAssets.Remove("assets");
+    await Reject(() => Task.FromResult(Read(noAssets.ToJsonString(), previous, false)));
+});
+await Test("a release without a tag, invalid JSON or a non-object response is rejected with a message", async () =>
+{
+    var json = JsonNode.Parse(ReleaseJson(exe))!.AsObject();
+    json.Remove("tag_name");
+    foreach (var bad in new[] { json.ToJsonString(), "{ not json", "[]", "null" })
+    {
+        try { Read(bad, previous, false); throw new Exception("accepted " + bad); }
+        catch (InvalidDataException ex) { Assert(ex.Message.Length > 0 && !ex.Message.Contains("null")); }
+    }
+    await Task.CompletedTask;
+});
+await Test("an empty feed (repository exists, no releases) is not an error", async () =>
+{
+    using var http = new HttpClient(new FakeHandler(request => new HttpResponseMessage(
+        request.RequestUri!.AbsoluteUri.EndsWith("/releases/latest") ? HttpStatusCode.NotFound : HttpStatusCode.OK) { Content = new StringContent("{}") }));
+    var client = new UpdateClient(http, Feed);
+    Assert(await client.CheckAsync(previous, false, default) is null && client.NoReleasesPublished);
+});
+await Test("a repository that does not exist is reported, not shown as up to date", async () =>
+{
+    using var http = new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
+    var client = new UpdateClient(http, Feed);
+    try { await client.CheckAsync(previous, false, default); throw new Exception("missing repository accepted"); }
+    catch (HttpRequestException ex) { Assert(ex.Message.Contains("not found") && !client.NoReleasesPublished); }
+});
+await Test("a network failure or timeout surfaces as a rejected check", async () =>
+{
+    using var offline = new HttpClient(new FakeHandler(_ => throw new HttpRequestException("No such host is known.", new System.Net.Sockets.SocketException(11001))));
+    await Reject(() => new UpdateClient(offline, Feed).CheckAsync(previous, false, default));
+    using var slow = new HttpClient(new FakeHandler(_ => throw new TaskCanceledException("The request timed out.")));
+    await Reject(() => new UpdateClient(slow, Feed).CheckAsync(previous, false, default));
+});
+await Test("the service shows 'No releases published yet' for an empty feed", async () =>
+{
+    var settings = new GeneralSettings { UpdateChecksChoiceMade = true };
+    using var http = new HttpClient(new FakeHandler(request => new HttpResponseMessage(
+        request.RequestUri!.AbsoluteUri.EndsWith("/releases/latest") ? HttpStatusCode.NotFound : HttpStatusCode.OK) { Content = new StringContent("{}") }));
+    using var updates = new UpdateService(settings, Dispatcher.CurrentDispatcher, new SettingsStore(), () => { }, http, Feed);
+    await updates.CheckAsync();
+    Assert(updates.State.Status.StartsWith("No releases published yet.") && !updates.State.HasUpdate && updates.State.ReleaseDetails == "");
+});
+await Test("the service shows release details with fallbacks for an available update", async () =>
+{
+    var settings = new GeneralSettings { UpdateChecksChoiceMade = true };
+    using var http = new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ReleaseJson(exe, tag: "v9.0.0")) }));
+    using var updates = new UpdateService(settings, Dispatcher.CurrentDispatcher, new SettingsStore(), () => { }, http, Feed);
+    await updates.CheckAsync();
+    Assert(updates.State.HasUpdate && updates.State.ReleaseDetails == $"v9.0.0 · {UpdateRelease.NoDateText}\n{UpdateRelease.NoNotesText}");
+    Assert(!updates.State.AvailableText.Contains("null") && updates.State.AvailableText.StartsWith(Brand.ProductName));
 });
 await Test("verifies a valid exe download", () => InDirectory(async dir =>
 {
@@ -195,7 +285,7 @@ await Test("update notifications remain suppressed for the same version after re
     var settings = new GeneralSettings { UpdateChecksChoiceMade = true };
     var store = new SettingsStore();
     HttpClient Client() => new(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
-        { Content = new StringContent(ReleaseJson(exe, tag: "v0.5.0")) }));
+        { Content = new StringContent(ReleaseJson(exe, tag: "v9.0.0")) })); // newer than the app itself (OrbitDesk 0.5.0)
     using var updates = new UpdateService(settings, Dispatcher.CurrentDispatcher, store, () => { }, Client(), Feed);
     var events = 0;
     updates.UpdateAvailable += () => events++;
