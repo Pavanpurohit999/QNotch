@@ -17,6 +17,8 @@ var tests = new List<(string Name, Action Run)>
     ("Taildrop LocalAPI parsing, escaped paths, safe inbox names and set-if-changed state", TaildropChecks.Deterministic),
     ("Drop screen targets: File tray and Taildrop tiles, and the reasons a tile is off", DropChecks.Run),
     ("Small and Medium bodies fit live, empty, loading and error states", CardRenderingChecks.Run),
+    ("Presets: 11 built-ins, complete palettes, WCAG text contrast in every mode", PresetChecks.Builtins),
+    ("Preset files: versioned round trip, clamping, and rejection of invalid or hostile imports", PresetChecks.Files),
     ("Materials: DWM backdrop types, simulated island brushes clamp opacity and freeze, settings round-trip", () =>
     {
         Require(QNotch.Theme.Materials.BackdropType(WindowMaterial.Solid) == 1 && QNotch.Theme.Materials.BackdropType(WindowMaterial.Mica) == 2

@@ -111,6 +111,8 @@ public partial class App : Application
         var tour = FirstRun.Decide(!fresh, gs.OnboardingDone, snapDir is not null);
         if (tour == TourStart.MarkDone) { gs.OnboardingDone = true; _store.Save("general", gs); }
         Motion.Refresh(gs.ReduceMotion);
+        // Custom appearance presets before the first theme pass; an invalid entry (edited by hand) is skipped, not fatal.
+        ThemeManager.CustomPresets = AppearancePresets.LoadValid(_store.Get<PresetFile>(AppearancePresets.StoreId));
         ThemeManager.Apply(gs);
         var bus = new EventBus(Dispatcher);
         var cards = new Registry<CardDescriptor>();
@@ -155,7 +157,7 @@ public partial class App : Application
         sections.Register(new SettingsSectionDescriptor("features", "Features", Glyphs.Apps, 5, () => FeaturesSection.Create(gs, _store!, ModuleList.All, bootDisabled, Restart, layout, tabs, segments)));
         sections.Register(new SettingsSectionDescriptor("general", "General", Glyphs.Settings, 0, () => GeneralSection.Create(gs, _store!, SetupCode.All(ModuleList.All), Restart, shell.Nudge.ResetAll)));
         sections.Register(new SettingsSectionDescriptor("about", "About", "\uE946", 1000, () => AboutSection.Create(gs, updates, () => ShowTour(gs, _store!, shortcuts, shell), () => Shutdown())));
-        sections.Register(new SettingsSectionDescriptor("appearance", "Appearance", Glyphs.Color, 10, () => AppearanceSection.Create(gs, layout)));
+        sections.Register(new SettingsSectionDescriptor("appearance", "Appearance", Glyphs.Color, 10, () => AppearanceSection.Create(gs, layout, _store!)));
         sections.Register(new SettingsSectionDescriptor("hotkeys", "Hotkeys", "", 7, () => HotkeysSection.Create(shortcuts)));
         sections.Register(new SettingsSectionDescriptor("sounds", "Sounds", Glyphs.Volume, 8, () => SoundsSection.Create(sounds)));
         sections.Register(new SettingsSectionDescriptor("gamemode", "Game mode", Glyphs.Game, 20, () => GameModeSection.Create(shell.GameMode, shortcuts, segments)));

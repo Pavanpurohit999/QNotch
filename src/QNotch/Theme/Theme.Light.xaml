@@ -12,11 +12,11 @@
     <SolidColorBrush x:Key="ControlHoverBrush" Color="#17000000"/>
     <SolidColorBrush x:Key="ControlPressedBrush" Color="#21000000"/>
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1C1C1E"/>
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5B5B61"/>
-    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8D8D93"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#55555B"/>
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#69696F"/>
     <SolidColorBrush x:Key="DangerBrush" Color="#D63A33"/>
     <SolidColorBrush x:Key="SuccessBrush" Color="#1F8F57"/>
-    <SolidColorBrush x:Key="WarningBrush" Color="#B86E00"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="#A65F00"/>
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#40000000"/>
     <SolidColorBrush x:Key="IslandRimBrush" Color="#14000000"/>
 </ResourceDictionary>

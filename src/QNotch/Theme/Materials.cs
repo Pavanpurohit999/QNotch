@@ -79,9 +79,8 @@ public static class Materials
         target.BackgroundColor = Colors.Transparent;
         // Acrylic samples whatever is behind the window and can come out far lighter (or darker) than the theme, which washed out
         // hint text in testing. A theme-colored tint keeps contrast close to the solid theme; Mica is already theme-tinted by Windows.
-        window.Resources["WindowBrush"] = Frozen(applied == WindowMaterial.Acrylic
-            ? (dark ? Color.FromArgb(0x9E, 0x10, 0x10, 0x11) : Color.FromArgb(0x9E, 0xF4, 0xF4, 0xF5))
-            : Colors.Transparent);
+        var tint = ThemeManager.Current("WindowBrush") ?? (dark ? Color.FromRgb(0x10, 0x10, 0x11) : Color.FromRgb(0xF4, 0xF4, 0xF5));
+        window.Resources["WindowBrush"] = Frozen(applied == WindowMaterial.Acrylic ? Color.FromArgb(0x9E, tint.R, tint.G, tint.B) : Colors.Transparent);
         window.SetResourceReference(Window.BackgroundProperty, "WindowBrush");
         window.Resources["SurfaceRaisedBrush"] = Frozen(dark ? Color.FromArgb(0x1A, 0, 0, 0) : Color.FromArgb(0x0A, 0, 0, 0));
         window.Resources["CardBrush"] = Frozen(dark ? Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0xB3, 0xFF, 0xFF, 0xFF));
@@ -103,16 +102,19 @@ public static class Materials
     {
         foreach (var key in IslandKeys) root.Resources.Remove(key);
         if (material == IslandMaterial.Solid) return;
-        foreach (var (key, brush) in IslandBrushes(material, opacity, highlight, ThemeManager.IsDark)) root.Resources[key] = brush;
+        foreach (var (key, brush) in IslandBrushes(material, opacity, highlight, ThemeManager.IsDark, ThemeManager.Current("SurfaceBrush")))
+            root.Resources[key] = brush;
     }
 
     /// <summary>The brushes for a simulated island material (also used by the Appearance preview).</summary>
-    public static IEnumerable<(string Key, Brush Brush)> IslandBrushes(IslandMaterial material, double opacity, double highlight, bool dark)
+    public static IEnumerable<(string Key, Brush Brush)> IslandBrushes(IslandMaterial material, double opacity, double highlight, bool dark,
+        Color? surface = null)
     {
         var a = (byte)Math.Round(255 * Math.Clamp(opacity, 0.5, 1));
         var h = Math.Clamp(highlight, 0, 1);
         var glass = material == IslandMaterial.Glass;
-        var baseColor = dark ? Color.FromRgb(0x0A, 0x0A, 0x0C) : Color.FromRgb(0xF7, 0xF7, 0xF8);
+        // The preset's surface color, opaque, so a Nord or Dracula notch stays in its palette when it turns to glass.
+        var baseColor = surface is { } c ? Color.FromRgb(c.R, c.G, c.B) : dark ? Color.FromRgb(0x0A, 0x0A, 0x0C) : Color.FromRgb(0xF7, 0xF7, 0xF8);
         var lift = Colors.White;
 
         // Body: the tint, a little lighter toward the bottom where light would catch a glass edge.

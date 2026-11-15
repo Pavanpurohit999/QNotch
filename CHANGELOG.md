@@ -14,7 +14,20 @@ Versions follow [semantic versioning](https://semver.org/). Release tags are `vX
 - Design tokens (`Theme/Tokens.xaml`): corner radii, spacing, type ramp, icon sizes and motion timings in one place; the shared
   styles now take their corner radii from it.
 
+- Appearance Studio at the top of Settings, Appearance: a live preview built from real controls (hover or focus a preset to
+  preview it, click to apply) and 11 presets: Orbit (follows Theme), Liquid Glass Dark and Light, Catppuccin Mocha, Nord,
+  Dracula, AMOLED Black, Windows Fluent, Frosted Glass, Minimal Transparent and High Contrast. A preset sets the palette of the
+  whole app (notch, panel, cards, settings, menus, tooltips) and its accent and materials, which stay adjustable.
+- Preset manager: save the current look as a preset, rename, duplicate, delete (two-step), import and export
+  (`.orbit-preset.json`, versioned and validated before use), restore default. Custom presets live in `appearance-presets.json`.
+
+### Changed
+- Hint and secondary text colors were raised so every built-in palette meets WCAG AA (4.5:1) for body text and AAA (7:1) for
+  primary text on its opaque surfaces; a unit test enforces it.
+- "Start with Windows" says Orbit Desk instead of QNotch.
+
 ### Known limitations
+- Presets set colors and materials; there is no per-color editor yet (an exported preset file can be edited and imported).
 - Popups and context menus are transparent windows too, so they do not get real Mica or Acrylic.
 - On the test laptop (Ryzen 3 3250U) idle CPU while collapsed measures about 0.2% of one core, above the 0.1% target, for
   both 0.5.0 and this build.

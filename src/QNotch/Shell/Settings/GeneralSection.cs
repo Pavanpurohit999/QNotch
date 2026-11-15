@@ -30,7 +30,7 @@ public static class GeneralSection
             SliderBox(100, 1500, 50, gs.LeaveDelayMs, v => { Analytics.Track("settings", "change", target: "close_delay"); gs.LeaveDelayMs = v; }, "ms")));
 
         page.Children.Add(UiKit.Row("Keep panel open", "Pinned: the panel stays open when the pointer leaves.", BoundToggle(gs, nameof(GeneralSettings.Pinned))));
-        page.Children.Add(UiKit.Row("Start with Windows", "Adds QNotch to your sign-in items.", BoundToggle(gs, nameof(GeneralSettings.StartWithWindows))));
+        page.Children.Add(UiKit.Row("Start with Windows", $"Adds {Brand.ProductName} to your sign-in items.", BoundToggle(gs, nameof(GeneralSettings.StartWithWindows))));
         Share(page, store, share, restart);
         var usage = BoundToggle(gs, nameof(GeneralSettings.ShareUsageData));
         usage.IsEnabled = Analytics.EnvironmentAllows;

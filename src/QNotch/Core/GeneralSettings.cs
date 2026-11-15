@@ -22,6 +22,8 @@ public sealed partial class GeneralSettings : ObservableObject
     [ObservableProperty] string _gameModeHotkey = "Ctrl+Alt+G";
     [ObservableProperty] string _accentColor = "mono"; // ThemeManager.Mono: follows the theme (white on dark, black on light)
     [ObservableProperty] ThemeChoice _theme = ThemeChoice.System;
+    /// <summary>The appearance preset id (Core/AppearancePresets.cs): a built-in or a custom preset; unknown ids fall back to Orbit.</summary>
+    [ObservableProperty] string _themePreset = AppearancePresets.DefaultId;
     [ObservableProperty] bool _reduceMotion;
     /// <summary>Settings window backdrop (Theme/Materials.cs): a real Windows material where supported, else solid.</summary>
     [ObservableProperty] WindowMaterial _windowMaterial = WindowMaterial.Mica;

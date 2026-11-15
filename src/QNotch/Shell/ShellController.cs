@@ -662,7 +662,7 @@ public sealed class ShellController : IShell
         switch (e.PropertyName)
         {
             case nameof(GeneralSettings.MonitorIndex): _w.SetMonitor(_general.MonitorIndex); break;
-            case nameof(GeneralSettings.AccentColor) or nameof(GeneralSettings.Theme): ThemeManager.Apply(_general); break;
+            case nameof(GeneralSettings.AccentColor) or nameof(GeneralSettings.Theme) or nameof(GeneralSettings.ThemePreset): ThemeManager.Apply(_general); break;
             case nameof(GeneralSettings.IslandMaterial) or nameof(GeneralSettings.IslandOpacity) or nameof(GeneralSettings.GlassHighlight): ApplyIslandMaterial(); break;
             case nameof(GeneralSettings.ReduceMotion): Motion.Refresh(_general.ReduceMotion); break;
             case nameof(GeneralSettings.ProfileName) or nameof(GeneralSettings.ProfileImagePath): LoadProfile(); break;
