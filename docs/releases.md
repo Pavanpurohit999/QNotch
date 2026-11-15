@@ -54,7 +54,7 @@ Each step skips with a warning while its token is missing, so a release never fa
 
 To produce the manifests locally for a published release: `node scripts/package-managers.mjs --tag v0.8.4 --out dist/package-managers`, then `winget validate --manifest dist/package-managers/winget`, `scoop install dist/package-managers/scoop/bucket/qnotch.json`, or `choco pack dist/package-managers/chocolatey/qnotch.nuspec --outputdirectory dist/package-managers` followed by `choco install qnotch --source dist/package-managers` from an elevated terminal. None of these publishes anything.
 
-Copies installed this way can still update themselves from Settings, About; the package manager then reports the old version until its own update runs, which downloads the same file again. Chocolatey's package folder is writable only by administrators, so there the in-app update reports that it cannot write to the install folder; update with `choco upgrade qnotch` instead. The website offers each channel only once it is live (see [website/README.md](../website/README.md)).
+Copies installed this way can still update themselves from Settings, About; the package manager then reports the old version until its own update runs, which downloads the same file again. Chocolatey's package folder is writable only by administrators, so there the in-app update reports that it cannot write to the install folder; update with `choco upgrade qnotch` instead. Upstream QNotch's website offers each channel only once it is live; the Orbit Desk fork has no website and does not publish to package managers.
 
 ## Microsoft Store
 

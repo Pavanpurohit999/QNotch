@@ -1,7 +1,7 @@
 // Chooses which platform jobs a pull request needs in CI (CONTRIBUTING.md, Build and check your change).
 // Usage: node scripts/ci-platforms.mjs <changed-files.txt> | --all
 // Prints windows=true|false and macos=true|false, one per line, for $GITHUB_OUTPUT.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const PLATFORMS = ['windows', 'macos'];
@@ -40,5 +40,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const platforms = arg === '--all'
     ? Object.fromEntries(PLATFORMS.map(platform => [platform, true]))
     : affectedPlatforms(readFileSync(arg, 'utf8').split(/\r?\n/).filter(Boolean));
+  // The Orbit Desk fork has no macOS port: there is nothing to build, so the build gate sees a deliberate skip.
+  if (!existsSync(new URL('../src/QNotch.Mac/Package.swift', import.meta.url))) platforms.macos = false;
   process.stdout.write(outputs(platforms));
 }

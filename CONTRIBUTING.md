@@ -58,7 +58,7 @@ npm ci
 npm run build
 ```
 
-See [website/README.md](website/README.md). Website redesign and platform download UX are separate from repository preparation.
+The Orbit Desk fork does not include the website; these steps apply only if a `website/` folder is added back. Website redesign and platform download UX are separate from repository preparation.
 
 ### Repository, shared contracts, and releases
 

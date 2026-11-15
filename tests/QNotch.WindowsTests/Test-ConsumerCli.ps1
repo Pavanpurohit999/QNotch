@@ -1,5 +1,5 @@
 param(
-    [string]$Executable = (Join-Path $PSScriptRoot '../../dist/QNotch.exe'),
+    [string]$Executable = (Join-Path $PSScriptRoot '../../dist/OrbitDesk.exe'),
     [string]$ReportPath,
     [switch]$Measure
 )

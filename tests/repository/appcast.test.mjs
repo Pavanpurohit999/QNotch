@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { addItem, appcastItem, emptyFeed, maxItems, plistPublicKey, publicKeyFor } from '../../scripts/macos/appcast.mjs';
+import { repository } from '../../scripts/release-policy.mjs';
+
+// The Orbit Desk fork removed the macOS port; tests that read its files skip until it is back.
+const macPortMissing = existsSync(new URL('../../src/QNotch.Mac/Info.plist', import.meta.url))
+  ? false : 'the macOS port (src/QNotch.Mac) is not in this repository';
 
 const signature = `${'A'.repeat(86)}==`;
 const item = (tag, build, notes) => appcastItem({ tag, build, length: 1234, signature, notes, date: new Date(Date.UTC(2026, 9, 18)) });
@@ -12,7 +17,7 @@ test('a stable Mac release is a default-channel arm64 item pointing at its own r
   assert.ok(xml.includes('<sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>'));
   assert.ok(xml.includes('<sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>'));
   assert.ok(xml.includes('<sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>'));
-  assert.ok(xml.includes('url="https://github.com/Somafet/qnotch/releases/download/macos-v0.2.0/QNotch-macos-arm64.zip"'));
+  assert.ok(xml.includes(`url="https://github.com/${repository}/releases/download/macos-v0.2.0/QNotch-macos-arm64.zip"`));
   assert.ok(xml.includes(`length="1234"`) && xml.includes(`sparkle:edSignature="${signature}"`));
   assert.ok(!xml.includes('sparkle:channel'));
   assert.ok(!xml.includes('latest'));
@@ -47,7 +52,7 @@ test('adding is newest first, replaces a rerun of the same build, drops the old 
   assert.throws(() => addItem('<rss></rss>', item('macos-v0.2.0', 1), 1));
 });
 
-test('the signing key check derives the Ed25519 public key and reads the app\'s SUPublicEDKey', () => {
+test('the signing key check derives the Ed25519 public key and reads the app\'s SUPublicEDKey', { skip: macPortMissing }, () => {
   // RFC 8032, test 1.
   const seed = Buffer.from('9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60', 'hex').toString('base64');
   const expected = Buffer.from('d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a', 'hex').toString('base64');

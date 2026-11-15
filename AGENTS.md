@@ -6,7 +6,7 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for shared principles and the Windows im
 
 - Windows app: `src/QNotch/`, `tests/QNotch.UpdateTests/`, and `tests/QNotch.PhoneShareTests/`. Follow [the Windows agent instructions](src/QNotch/AGENTS.md), including the publish and Explorer-launch rules, for work in any of these paths or on Windows packaging.
 - macOS: native Swift/AppKit implementation in `src/QNotch.Mac/`. Read [the macOS guide](docs/macos/README.md) for build, test, smoke, and launch commands. Do not claim feature parity or require Windows tooling for Mac-only work.
-- Website: `website/`. Follow [website/README.md](website/README.md) and run its static build.
+- Website: not part of the Orbit Desk fork (upstream QNotch keeps its website in its own repository). CI skips the website job while `website/` is absent.
 - Repository tooling: `scripts/`, `tests/repository/`, and `.github/`. Run `npm ci` and `npm test` from the root with Node.js 24 or newer. Workflow changes must preserve the required `build` check and existing Windows release compatibility.
 
 Do not move the Windows app, rename its downloads, change the latest-release endpoint, or change the contents of its single-exe ZIP as part of repository preparation. A Mac release must never replace the global Windows latest release. Use the guarded publisher documented in the release guide.

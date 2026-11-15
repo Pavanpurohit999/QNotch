@@ -59,7 +59,7 @@ Choose the area you are working on:
 
 - [Windows development](docs/windows/development.md): .NET 10 build, updater/phone-sharing tests, snapshots, and both publish profiles.
 - [macOS development](docs/macos/README.md): native build, tests, UI smoke checks, and launch commands.
-- [Website](website/README.md): independent Astro project.
+- Website: not included in the Orbit Desk fork.
 - [Repository tooling and CI](docs/releases.md#required-checks): Node.js 24+, `npm ci`, then `npm test` from the root.
 
 The existing `QNotch.sln` remains a Windows solution. A Mac contributor does not need to build it.

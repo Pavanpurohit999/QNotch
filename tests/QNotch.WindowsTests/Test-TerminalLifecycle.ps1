@@ -1,4 +1,4 @@
-param([string]$Executable = (Join-Path $PSScriptRoot '../../dist/QNotch.exe'))
+param([string]$Executable = (Join-Path $PSScriptRoot '../../dist/OrbitDesk.exe'))
 $ErrorActionPreference = 'Stop'
 $exe = (Resolve-Path $Executable).Path
 $data = Join-Path ([IO.Path]::GetTempPath()) ('qnotch-terminal-ui-' + [guid]::NewGuid().ToString('N'))

@@ -7,6 +7,11 @@ import { parseDocument } from 'yaml';
 import { affectedPlatforms, outputs } from '../../scripts/ci-platforms.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
+
+// The Orbit Desk fork removed the macOS port; tests that read its files skip until it is back.
+const macPortMissing = existsSync(resolve(root, 'src/QNotch.Mac/Package.swift'))
+  ? false : 'the macOS port (src/QNotch.Mac) is not in this repository';
+
 function yaml(path) {
   const document = parseDocument(readFileSync(resolve(root, path), 'utf8'), { uniqueKeys: true });
   assert.deepEqual(document.errors, [], path);
@@ -130,7 +135,7 @@ test('the Store package manifest keeps the Partner Center identity, startup task
   assert.ok(appPackage.includes('StartupTaskId = "QNotchStartup"') && appPackage.includes('"qnotch.exe"'));
 });
 
-test('Mac validation builds a real native app, runs regressions and UI smoke, checks its snapshots, without signing secrets or publishing', () => {
+test('Mac validation builds a real native app, runs regressions and UI smoke, checks its snapshots, without signing secrets or publishing', { skip: macPortMissing }, () => {
   const mac = yaml('.github/workflows/ci.yml').jobs.macos;
   assert.equal(mac['runs-on'], 'macos-15');
   const runs = mac.steps.filter(step => step.run).map(step => step.run);
@@ -150,7 +155,7 @@ test('Mac validation builds a real native app, runs regressions and UI smoke, ch
   assert.ok(!build.includes('dist/QNotch.exe'));
 });
 
-test('Mac release workflow tests, signs, notarizes and publishes only through the guarded Mac channel', () => {
+test('Mac release workflow tests, signs, notarizes and publishes only through the guarded Mac channel', { skip: macPortMissing }, () => {
   const release = yaml('.github/workflows/release-macos.yml');
   assert.deepEqual(release.on.push.tags, ['macos-v*']);
   assert.equal(release.concurrency.group, 'qnotch-release');
