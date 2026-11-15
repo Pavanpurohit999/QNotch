@@ -1,0 +1,215 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Pull requests run only the platform jobs their changes affect (scripts/ci-platforms.mjs). Pushes to main run both.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      windows: ${{ steps.platforms.outputs.windows }}
+      macos: ${{ steps.platforms.outputs.macos }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # The pull request checkout is a merge commit; its first parent is the base it merges into.
+      - name: Choose affected platforms
+        id: platforms
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            git diff --name-only --no-renames HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
+            node scripts/ci-platforms.mjs "$RUNNER_TEMP/changed.txt" | tee -a "$GITHUB_OUTPUT"
+          else
+            node scripts/ci-platforms.mjs --all | tee -a "$GITHUB_OUTPUT"
+          fi
+
+  windows:
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build
+        run: dotnet build src/QNotch/QNotch.csproj -c Release -warnaserror
+
+      - name: Updater checks
+        run: dotnet run --project tests/QNotch.UpdateTests -c Release
+
+      - name: Phone sharing checks
+        run: dotnet run --project tests/QNotch.PhoneShareTests -c Release
+
+      - name: Welcome tour checks
+        run: dotnet run --project tests/QNotch.OnboardingTests -c Release
+
+      - name: Windows behavior checks
+        run: dotnet run --project tests/QNotch.WindowsTests -c Release -- --conpty
+
+      - name: Native Terminal lifecycle
+        shell: pwsh
+        run: ./tests/QNotch.WindowsTests/Test-TerminalLifecycle.ps1 -Executable ./src/QNotch/bin/Release/net10.0-windows10.0.22621.0/win-x64/QNotch.exe
+
+      - name: Consumer CLI lifecycle
+        shell: pwsh
+        run: ./tests/QNotch.WindowsTests/Test-ConsumerCli.ps1 -Executable ./src/QNotch/bin/Release/net10.0-windows10.0.22621.0/win-x64/QNotch.exe
+
+      # Renders every view (pill states, tabs, cards, settings, welcome tour) off-screen in a clean data folder. Fails if a view throws or it hangs.
+      - name: Snapshot smoke test
+        shell: pwsh
+        env:
+          QNOTCH_DATA_DIR: ${{ runner.temp }}\qnotch-data
+          DOTNET_DISABLE_GUI_ERRORS: '1'
+        run: |
+          New-Item -ItemType Directory -Force $env:QNOTCH_DATA_DIR | Out-Null
+          $exe = "src/QNotch/bin/Release/net10.0-windows10.0.22621.0/win-x64/QNotch.exe"
+          $p = Start-Process $exe -ArgumentList '--snapshot', "$PWD\snapshots" -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw "Snapshot timed out" }
+          if ($p.ExitCode -ne 0) { throw "Snapshot exited with code $($p.ExitCode)" }
+          $report = Get-Content snapshots/snapshot.txt
+          $report
+          if ($report[-1] -ne 'done') { throw "Snapshot failed" }
+
+      # spec/diagnostics.md: report, outlines, file names and required views.
+      - name: Check snapshot files
+        run: node scripts/check-snapshots.mjs snapshots
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snapshots
+          path: snapshots
+          if-no-files-found: ignore
+
+      # spec/diagnostics.md, Smoke checks: the same views, then the real shell on screen, driven through its own methods (no real input).
+      # A check that needs the foreground reports a skip when Windows withholds it. Own data folder and instance; smoke.log has the details.
+      - name: Shell smoke test
+        shell: pwsh
+        env:
+          QNOTCH_INSTANCE: ci-smoke
+          DOTNET_DISABLE_GUI_ERRORS: '1'
+        run: |
+          $exe = "src/QNotch/bin/Release/net10.0-windows10.0.22621.0/win-x64/QNotch.exe"
+          $p = Start-Process $exe -ArgumentList '--smoke-test', "$PWD\smoke", '--data-dir', "$env:RUNNER_TEMP\qnotch-smoke" -PassThru
+          if (-not $p.WaitForExit(240000)) { $p.Kill(); throw "Smoke test timed out" }
+          Get-Content smoke/smoke.txt
+          if ($p.ExitCode -ne 0) { throw "Smoke test exited with code $($p.ExitCode)" }
+          node scripts/check-snapshots.mjs smoke
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke
+          path: smoke
+          if-no-files-found: ignore
+
+  macos:
+    needs: changes
+    if: needs.changes.outputs.macos == 'true'
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native Mac app without signing credentials
+        run: bash scripts/macos/build.sh
+      - name: Mac regression tests
+        run: bash scripts/macos/test.sh
+      - name: Native Mac UI smoke test
+        run: bash scripts/macos/smoke.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check snapshots against the diagnostics contract
+        run: node scripts/check-snapshots.mjs dist/macos/smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-smoke
+          path: dist/macos/smoke
+          if-no-files-found: error
+
+  repository:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Lint GitHub Actions workflows
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+
+  website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  # Branch protection already requires "build". Never rename it or skip it on failure.
+  # A platform job counts as passed only when it succeeded, or when the changes job deliberately skipped it.
+  build:
+    name: build
+    if: always()
+    needs: [changes, windows, macos, repository, website]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every validation job to succeed
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          WINDOWS_RESULT: ${{ needs.windows.result }}
+          WINDOWS_AFFECTED: ${{ needs.changes.outputs.windows }}
+          MACOS_RESULT: ${{ needs.macos.result }}
+          MACOS_AFFECTED: ${{ needs.changes.outputs.macos }}
+          REPOSITORY_RESULT: ${{ needs.repository.result }}
+          WEBSITE_RESULT: ${{ needs.website.result }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          test "$REPOSITORY_RESULT" = success
+          test "$WEBSITE_RESULT" = success
+          platform() {
+            if [ "$2" = success ] || { [ "$2" = skipped ] && [ "$3" = false ]; }; then echo "$1: $2"; return; fi
+            echo "$1: $2 (affected: ${3:-unknown})"
+            exit 1
+          }
+          platform windows "$WINDOWS_RESULT" "$WINDOWS_AFFECTED"
+          platform macos "$MACOS_RESULT" "$MACOS_AFFECTED"

@@ -1,0 +1,112 @@
+using QNotch.Core;
+using QNotch.Modules;
+
+namespace QNotch.Shell;
+
+/// <summary>
+/// Order and visibility of Home cards, persisted in general.json. The order list also contains hidden cards, so a card
+/// re-enabled later returns to its old slot. HomeView renders from this and publishes the live hosts in <see cref="Hosts"/>.
+/// </summary>
+public sealed class CardLayout
+{
+    readonly Registry<CardDescriptor> _cards;
+    readonly GeneralSettings _gs;
+    List<CardDescriptor>? _ordered;
+
+    public CardLayout(Registry<CardDescriptor> cards, GeneralSettings gs)
+    {
+        _cards = cards;
+        _gs = gs;
+        cards.Changed += () => { _ordered = null; Changed?.Invoke(); };
+    }
+
+    /// <summary>Raised after order or visibility changed (settings are already updated and will be saved).</summary>
+    public event Action? Changed;
+    /// <summary>Raised by HomeView after it rebuilt <see cref="Hosts"/>.</summary>
+    public event Action? HostsChanged;
+
+    /// <summary>Currently displayed cards in display order (visible only). Maintained by HomeView.</summary>
+    public IReadOnlyList<CardHost> Hosts { get; private set; } = [];
+    internal void SetHosts(IReadOnlyList<CardHost> hosts) { Hosts = hosts; HostsChanged?.Invoke(); }
+
+    /// <summary>All registered cards (hidden included) in display order.</summary>
+    public IReadOnlyList<CardDescriptor> Ordered => _ordered ??= Resolve();
+
+    public IEnumerable<CardDescriptor> Visible => Ordered.Where(c => IsVisible(c.Id));
+    public string OwnerOf(string id) => _cards.OwnerOf(id);
+
+    public bool IsVisible(string id) =>
+        _gs.CardVisible.TryGetValue(id, out var v) ? v : _cards.Find(id)?.DefaultVisible ?? false;
+
+    public int OrderNumber(string id) => Ordered.ToList().FindIndex(c => c.Id == id) + 1;
+
+    public CardSize SizeOf(string id)
+    {
+        var card = _cards.Find(id);
+        if (card is null) return CardSize.Small;
+        if (_gs.CardSizes.TryGetValue(id, out var value) && Enum.TryParse<CardSize>(value, out var size)
+            && card.SupportedSizes.Contains(size)) return size;
+        return card.SupportedSizes.Contains(card.DefaultSize) ? card.DefaultSize : CardSize.Small;
+    }
+
+    /// <summary>Applies a supported size. Records one resize when it changes the size, unless <paramref name="track"/> is off (drag previews).</summary>
+    public void SetSize(string id, CardSize size, bool track = true)
+    {
+        if (_cards.Find(id) is not { } card || !card.SupportedSizes.Contains(size) || SizeOf(id) == size) return;
+        if (track) QNotch.Core.Analytics.Track("shell", "resize_card", "ui");
+        _gs.CardSizes[id] = size.ToString();
+        Save();
+    }
+
+    /// <summary>Ends a drag that previewed sizes with track off: a cancel restores <paramref name="start"/>, a changed size records one resize.</summary>
+    public void EndResize(string id, CardSize start, bool canceled)
+    {
+        if (canceled) SetSize(id, start, track: false);
+        else if (SizeOf(id) != start) QNotch.Core.Analytics.Track("shell", "resize_card", "ui");
+    }
+
+    public void SetVisible(string id, bool visible)
+    { QNotch.Core.Analytics.Track("shell", "change_card_visibility", target: id switch { "system" => "stats", "ai-usage" or "ai-apps" => "ai", _ => id }, enabled: visible);
+        _gs.CardVisible[id] = visible;
+        Save();
+    }
+
+    /// <summary>Move card <paramref name="id"/> into the slot currently held by <paramref name="targetId"/>.</summary>
+    public void Move(string id, string targetId)
+    { QNotch.Core.Analytics.Track("shell", "reorder_cards", "ui");
+        var order = FullOrder();
+        var from = order.IndexOf(id);
+        var to = order.IndexOf(targetId);
+        if (from < 0 || to < 0 || from == to) return;
+        order.RemoveAt(from);
+        order.Insert(to, id);
+        _gs.CardOrder = order;
+        Save();
+    }
+
+    void Save()
+    {
+        _ordered = null;
+        _gs.CardOrder = FullOrder();
+        Changed?.Invoke();
+        // Persisted by the shell (it watches Changed and saves general.json).
+    }
+
+    /// <summary>The persisted order plus cards not in it yet. Ids of unregistered cards (module off) are kept, so they return to their slot.</summary>
+    List<string> FullOrder()
+    {
+        var ids = _gs.CardOrder.ToList();
+        foreach (var c in Ordered) if (!ids.Contains(c.Id)) ids.Add(c.Id);
+        return ids;
+    }
+
+    List<CardDescriptor> Resolve()
+    {
+        var byId = _cards.Items.ToDictionary(c => c.Id);
+        var result = new List<CardDescriptor>();
+        foreach (var id in _gs.CardOrder)
+            if (byId.Remove(id, out var c)) result.Add(c);
+        result.AddRange(byId.Values.OrderBy(c => c.DefaultOrder));
+        return result;
+    }
+}

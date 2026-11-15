@@ -1,0 +1,14 @@
+bin/
+obj/
+dist/
+*.user
+.vs/
+brag-output/
+.claude/worktrees/
+.claude/settings.local.json
+node_modules/
+.DS_Store
+*.xcuserstate
+xcuserdata/
+.build/
+.swiftpm/

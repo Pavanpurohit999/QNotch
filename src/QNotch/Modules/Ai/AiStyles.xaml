@@ -1,0 +1,129 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ai="clr-namespace:QNotch.Modules.Ai">
+
+    <!-- Account picker that reads as caption text: the name and a small chevron, no chrome. Items need a Name; Tag is an optional prefix. -->
+    <Style x:Key="AccountPicker" TargetType="ComboBox">
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton Focusable="False" ClickMode="Press" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton"><Border Background="Transparent"/></ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                            <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <TextBlock Text="{Binding SelectedItem.Name, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="7" VerticalAlignment="Center" Margin="5,2,0,0"/>
+                        </StackPanel>
+                        <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="None">
+                            <Border Margin="0,4,0,0" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource StrokeStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="0,4">
+                                <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Trigger>
+                        <Trigger Property="IsDropDownOpen" Value="True"><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- App tile button: raised chip with hover and pressed states. -->
+    <Style x:Key="AiTile" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="10">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource StrokeStrongBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlPressedBrush}"/></Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- First letter shown only while an app has no icon. -->
+    <Style x:Key="AiInitial" TargetType="TextBlock" BasedOn="{StaticResource Title}">
+        <Setter Property="Visibility" Value="Collapsed"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Icon}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Slot number badge: accent normally, warning when Alt+N is taken by another app. -->
+    <Style x:Key="AiBadge" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+        <Setter Property="CornerRadius" Value="7"/>
+        <Setter Property="MinWidth" Value="14"/>
+        <Setter Property="Height" Value="14"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Slot}" Value="0"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+            <DataTrigger Binding="{Binding HotkeyConflict}" Value="True"><Setter Property="Background" Value="{DynamicResource WarningBrush}"/></DataTrigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="AiBadgeText" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="9"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding HotkeyConflict}" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}"/></DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Compact tile for the Home card. -->
+    <DataTemplate x:Key="AppTileSmall" DataType="{x:Type ai:AiAppItem}">
+        <Button Style="{StaticResource AiTile}" Width="40" Height="40" Margin="0,0,6,6" ToolTip="{Binding Tooltip}"
+                Command="{Binding DataContext.LaunchCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+            <Grid>
+                <Image Source="{Binding Icon}" Width="24" Height="24" RenderOptions.BitmapScalingMode="HighQuality"/>
+                <TextBlock Text="{Binding Initial}" Style="{StaticResource AiInitial}"/>
+                <Border Style="{StaticResource AiBadge}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-8,-8">
+                    <TextBlock Text="{Binding Slot}" Style="{StaticResource AiBadgeText}"/>
+                </Border>
+            </Grid>
+        </Button>
+    </DataTemplate>
+
+    <!-- Larger tile with name for the AI tab. -->
+    <DataTemplate x:Key="AppTileLarge" DataType="{x:Type ai:AiAppItem}">
+        <Button Style="{StaticResource AiTile}" Width="96" Height="78" Margin="0,0,8,8" ToolTip="{Binding Tooltip}"
+                Command="{Binding DataContext.LaunchCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+            <Grid Width="96" Height="78">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <Grid Width="32" Height="32" HorizontalAlignment="Center">
+                        <Image Source="{Binding Icon}" Width="32" Height="32" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <TextBlock Text="{Binding Initial}" Style="{StaticResource AiInitial}" FontSize="18"/>
+                    </Grid>
+                    <TextBlock Text="{Binding Name}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" MaxWidth="80" Margin="0,8,0,0" HorizontalAlignment="Center"/>
+                </StackPanel>
+                <Border Style="{StaticResource AiBadge}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,6,0">
+                    <TextBlock Text="{Binding Slot}" Style="{StaticResource AiBadgeText}"/>
+                </Border>
+            </Grid>
+        </Button>
+    </DataTemplate>
+</ResourceDictionary>

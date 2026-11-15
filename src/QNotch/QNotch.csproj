@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Multi-size icon for Explorer, the taskbar and Alt-Tab; regenerate with Assets/Build-AppIcon.ps1 from Assets/AppIcon.svg. -->
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <!-- Program.Main handles command line verbs before WPF starts; App.xaml still generates its own Main. -->
+    <StartupObject>QNotch.Program</StartupObject>
+    <RootNamespace>QNotch</RootNamespace>
+    <AssemblyName>OrbitDesk</AssemblyName>
+    <Product>Orbit Desk</Product>
+    <!-- Baseline for local builds. The tagged release workflow supplies the release version. -->
+    <Version>0.4.0</Version>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <!-- No tiered JIT: at a 5 s idle cadence methods take minutes to reach the tier-up threshold, so the background JIT kept
+         re-compiling (about 50 ms CPU per tick, 10x the app's own work) and doubled the code in memory. Full JIT up front costs
+         about 65 ms of startup; R2R framework code is used as is. -->
+    <TieredCompilation>false</TieredCompilation>
+    <!-- ObservableObject raises only PropertyChanged (nothing here listens to PropertyChanging). -->
+    <MvvmToolkitEnableINotifyPropertyChangingSupport>false</MvvmToolkitEnableINotifyPropertyChangingSupport>
+    <UseSystemResourceKeys>false</UseSystemResourceKeys>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;MVVMTK0045</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Threading" />
+    <Using Include="System.Threading.Tasks" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Core/Updates/ApplyUpdate.ps1" />
+    <EmbeddedResource Include="analytics-config.json" />
+    <Resource Include="Modules/Weather/Icons/*.png" />
+    <InternalsVisibleTo Include="QNotch.UpdateTests" />
+    <InternalsVisibleTo Include="QNotch.PhoneShareTests" />
+    <InternalsVisibleTo Include="QNotch.OnboardingTests" />
+    <InternalsVisibleTo Include="QNotch.WindowsTests" />
+  </ItemGroup>
+  <!-- Evaluate after the publish profile, so the updater preserves the installed runtime variant. -->
+  <Target Name="UpdateBuildMetadata" BeforeTargets="GetAssemblyAttributes">
+    <ItemGroup>
+      <AssemblyMetadata Include="QNotchSelfContained" Value="$(SelfContained)" />
+    </ItemGroup>
+  </Target>
+  <!-- What was built, for performance.json (the measure mode): the commit and whether tracked files had changes. Left out without git. -->
+  <Target Name="SourceRevisionMetadata" BeforeTargets="GetAssemblyAttributes">
+    <Exec Command="git rev-parse HEAD" WorkingDirectory="$(MSBuildProjectDirectory)" ConsoleToMSBuild="true" IgnoreExitCode="true" EchoOff="true"
+          StandardOutputImportance="low" StandardErrorImportance="low" IgnoreStandardErrorWarningFormat="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="QNotchRevision" />
+      <Output TaskParameter="ExitCode" PropertyName="QNotchRevisionExit" />
+    </Exec>
+    <Exec Command="git status --porcelain --untracked-files=no" Condition="'$(QNotchRevisionExit)' == '0'" WorkingDirectory="$(MSBuildProjectDirectory)" ConsoleToMSBuild="true"
+          IgnoreExitCode="true" EchoOff="true" StandardOutputImportance="low" StandardErrorImportance="low" IgnoreStandardErrorWarningFormat="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="QNotchStatus" />
+    </Exec>
+    <ItemGroup Condition="'$(QNotchRevisionExit)' == '0'">
+      <AssemblyMetadata Include="QNotchSourceRevision" Value="$(QNotchRevision)" />
+      <AssemblyMetadata Include="QNotchSourceDirty" Value="true" Condition="'$(QNotchStatus)' != ''" />
+      <AssemblyMetadata Include="QNotchSourceDirty" Value="false" Condition="'$(QNotchStatus)' == ''" />
+    </ItemGroup>
+  </Target>
+
+</Project>
