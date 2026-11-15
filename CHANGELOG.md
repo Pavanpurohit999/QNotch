@@ -3,6 +3,22 @@
 All notable changes to Orbit Desk. Orbit Desk is a fork of [QNotch](https://github.com/Somafet/qnotch) (MIT); see NOTICE.md.
 Versions follow [semantic versioning](https://semver.org/). Release tags are `vX.Y.Z`.
 
+## [Unreleased]
+
+### New
+- Material engine (`Theme/Materials.cs`). The Settings window can use a real Windows backdrop: Mica (default), Mica Alt or
+  Acrylic on Windows 11 22H2 and later, with a solid fallback elsewhere or if Windows refuses it. Acrylic gets a theme tint so
+  hint text keeps its contrast.
+- Notch materials: Solid (default), Glass and Clear, with opacity (50 to 100%) and glass highlight controls in Settings,
+  Appearance. These are simulated (tint, sheen, lit rim) because Windows cannot blur the notch's transparent window.
+- Design tokens (`Theme/Tokens.xaml`): corner radii, spacing, type ramp, icon sizes and motion timings in one place; the shared
+  styles now take their corner radii from it.
+
+### Known limitations
+- Popups and context menus are transparent windows too, so they do not get real Mica or Acrylic.
+- On the test laptop (Ryzen 3 3250U) idle CPU while collapsed measures about 0.2% of one core, above the 0.1% target, for
+  both 0.5.0 and this build.
+
 ## [0.5.0] - 2026-11-15
 
 First Orbit Desk release.

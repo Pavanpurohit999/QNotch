@@ -31,6 +31,32 @@ public static class AppearanceSection
         segBox.SetResourceReference(Border.BackgroundProperty, "ControlBrush");
         page.Children.Add(UiKit.Row("Theme", "Follow Windows, or force dark or light.", segBox));
 
+        // Materials (Theme/Materials.cs). Window backdrops are real Windows materials; the notch's are simulated.
+        var windowHint = Materials.BackdropsSupported
+            ? "A real Windows backdrop for this window. Mica tints with your wallpaper; Acrylic blurs what is behind the window."
+            : "Mica and Acrylic need Windows 11 version 22H2 or later. This window stays solid.";
+        var windowSeg = Segmented("window-material", gs.WindowMaterial, v => gs.WindowMaterial = v,
+            [(WindowMaterial.Solid, "Solid"), (WindowMaterial.Mica, "Mica"), (WindowMaterial.MicaAlt, "Mica Alt"), (WindowMaterial.Acrylic, "Acrylic")]);
+        windowSeg.IsEnabled = Materials.BackdropsSupported;
+        page.Children.Add(UiKit.Row("Window material", windowHint, windowSeg));
+
+        page.Children.Add(UiKit.Row("Notch material",
+            "Glass and Clear are simulated with tint, sheen and a lit rim: Windows cannot blur the notch's transparent window.",
+            Segmented("island-material", gs.IslandMaterial, v => gs.IslandMaterial = v,
+                [(IslandMaterial.Solid, "Solid"), (IslandMaterial.Glass, "Glass"), (IslandMaterial.Clear, "Clear")])));
+        var opacity = Percent("Notch opacity", gs.IslandOpacity, 50, 100, v => gs.IslandOpacity = v);
+        var highlight = Percent("Glass highlight", gs.GlassHighlight, 0, 100, v => gs.GlassHighlight = v);
+        var opacityRow = UiKit.Row("Notch opacity", "Lower shows more of the desktop. Text stays readable down to 50%.", opacity);
+        var highlightRow = UiKit.Row("Glass highlight", "The sheen and the lit lower rim of the Glass material.", highlight);
+        void Enable() { opacityRow.IsEnabled = gs.IslandMaterial != IslandMaterial.Solid; highlightRow.IsEnabled = gs.IslandMaterial == IslandMaterial.Glass; }
+        Enable();
+        System.ComponentModel.PropertyChangedEventHandler onMaterial = (_, e) => { if (e.PropertyName == nameof(GeneralSettings.IslandMaterial)) Enable(); };
+        // Settings pages are rebuilt with each window; follow the page's lifetime instead of holding it from GeneralSettings.
+        page.Loaded += (_, _) => { gs.PropertyChanged -= onMaterial; gs.PropertyChanged += onMaterial; Enable(); };
+        page.Unloaded += (_, _) => gs.PropertyChanged -= onMaterial;
+        page.Children.Add(opacityRow);
+        page.Children.Add(highlightRow);
+
         // Accent swatches
         var sw = new StackPanel { Orientation = Orientation.Horizontal };
         var rings = new List<(Border ring, string hex)>();
@@ -86,6 +112,37 @@ public static class AppearanceSection
         }
         page.Children.Add(cards);
         return page;
+    }
+
+    /// <summary>A segmented control (the Theme row's style) over enum values; checking one sets it.</summary>
+    static Border Segmented<T>(string group, T current, Action<T> set, (T Value, string Label)[] options) where T : struct, Enum
+    {
+        var seg = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var (value, label) in options)
+        {
+            var v = value;
+            var rb = new RadioButton { Style = (Style)Application.Current.FindResource("SegmentButton"), Content = label, GroupName = group, IsChecked = current.Equals(v) };
+            System.Windows.Automation.AutomationProperties.SetAutomationId(rb, $"{group}-{v.ToString().ToLowerInvariant()}");
+            rb.Checked += (_, _) => { Analytics.Track("settings", "change", target: group); set(v); };
+            seg.Children.Add(rb);
+        }
+        var box = new Border { CornerRadius = new CornerRadius(8), Child = seg };
+        box.SetResourceReference(Border.BackgroundProperty, "ControlBrush");
+        return box;
+    }
+
+    /// <summary>A 5% step slider for a 0..1 setting shown as a percentage, with its value beside it.</summary>
+    static FrameworkElement Percent(string name, double value, int min, int max, Action<double> set)
+    {
+        var slider = new Slider { Minimum = min, Maximum = max, Value = Math.Clamp(Math.Round(value * 100), min, max), Width = 180,
+            SmallChange = 5, LargeChange = 10, TickFrequency = 5, IsSnapToTickEnabled = true, VerticalAlignment = VerticalAlignment.Center };
+        System.Windows.Automation.AutomationProperties.SetName(slider, name);
+        var label = new TextBlock { Width = 44, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Text = $"{slider.Value:0}%" };
+        slider.ValueChanged += (_, e) => { label.Text = $"{e.NewValue:0}%"; set(e.NewValue / 100); };
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(slider);
+        row.Children.Add(label);
+        return row;
     }
 
     /// <summary>A swatch fill: the hex color, or for Mono a diagonal half white, half black.</summary>

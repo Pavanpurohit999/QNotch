@@ -4,6 +4,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace QNotch.Core;
 
 public enum ThemeChoice { System, Dark, Light }
+/// <summary>A real Windows system backdrop for normal windows (DWMWA_SYSTEMBACKDROP_TYPE, Windows 11 22H2+), or solid.</summary>
+public enum WindowMaterial { Solid, Mica, MicaAlt, Acrylic }
+/// <summary>The notch surface. Glass and Clear are simulated (translucent tint, sheen, rim): Windows cannot blur a layered window.</summary>
+public enum IslandMaterial { Solid, Glass, Clear }
 
 /// <summary>Shell settings (general.json). Live object: bind to it, mutate it; the shell persists changes automatically.</summary>
 public sealed partial class GeneralSettings : ObservableObject
@@ -19,6 +23,14 @@ public sealed partial class GeneralSettings : ObservableObject
     [ObservableProperty] string _accentColor = "mono"; // ThemeManager.Mono: follows the theme (white on dark, black on light)
     [ObservableProperty] ThemeChoice _theme = ThemeChoice.System;
     [ObservableProperty] bool _reduceMotion;
+    /// <summary>Settings window backdrop (Theme/Materials.cs): a real Windows material where supported, else solid.</summary>
+    [ObservableProperty] WindowMaterial _windowMaterial = WindowMaterial.Mica;
+    /// <summary>The notch's surface. Simulated: the notch is a layered window, which Windows cannot blur.</summary>
+    [ObservableProperty] IslandMaterial _islandMaterial = IslandMaterial.Solid;
+    /// <summary>Notch surface opacity for Glass and Clear, 0.5 to 1.</summary>
+    [ObservableProperty] double _islandOpacity = 0.82;
+    /// <summary>Glass rim and sheen strength, 0 to 1.</summary>
+    [ObservableProperty] double _glassHighlight = 0.6;
     [ObservableProperty] string _profileName = Environment.UserName;
     [ObservableProperty] string _profileImagePath = "";
     [ObservableProperty] bool _startWithWindows;

@@ -40,6 +40,9 @@ public sealed class ShellController : IShell
     int _holds;
     string _activeTab = "home";
 
+    /// <summary>The notch's simulated material (Theme/Materials.cs), from General settings.</summary>
+    void ApplyIslandMaterial() => Materials.ApplyIsland(_w.RootElement, _general.IslandMaterial, _general.IslandOpacity, _general.GlassHighlight);
+
     public ShellController(NotchWindow window, GeneralSettings settings, SettingsStore store, Shortcuts shortcuts, ForegroundWatcher foreground,
         CardLayout layout, Registry<TabDescriptor> tabs, Registry<SettingsSectionDescriptor> sections, Registry<SegmentDescriptor> segments,
         Registry<QuickActionDescriptor>? quickActions = null, Registry<DropSourceDescriptor>? drops = null)
@@ -50,6 +53,8 @@ public sealed class ShellController : IShell
         Drops = drops ?? new();
         Presentation = store.Get<WindowsPresentationSettings>("windows-presentation");
         Presentation.Changed += ApplyPresentation;
+        ApplyIslandMaterial();
+        ThemeManager.Changed += ApplyIslandMaterial; // dark/light brushes differ
         _vm = new ShellViewModel(settings, () => OpenSettings());
         _w.DataContext = _vm;
         GameMode = new GameModeController(this, store, foreground, segments);
@@ -658,6 +663,7 @@ public sealed class ShellController : IShell
         {
             case nameof(GeneralSettings.MonitorIndex): _w.SetMonitor(_general.MonitorIndex); break;
             case nameof(GeneralSettings.AccentColor) or nameof(GeneralSettings.Theme): ThemeManager.Apply(_general); break;
+            case nameof(GeneralSettings.IslandMaterial) or nameof(GeneralSettings.IslandOpacity) or nameof(GeneralSettings.GlassHighlight): ApplyIslandMaterial(); break;
             case nameof(GeneralSettings.ReduceMotion): Motion.Refresh(_general.ReduceMotion); break;
             case nameof(GeneralSettings.ProfileName) or nameof(GeneralSettings.ProfileImagePath): LoadProfile(); break;
             case nameof(GeneralSettings.StartWithWindows): if (!_store.ReadOnly) Autostart.Set(_general.StartWithWindows); break; // never in a snapshot run

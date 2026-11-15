@@ -20,4 +20,6 @@
     <SolidColorBrush x:Key="SuccessBrush" Color="#4CC38A"/>
     <SolidColorBrush x:Key="WarningBrush" Color="#F2A93B"/>
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#47FFFFFF"/>
+    <!-- The notch outline; Theme/Materials.cs replaces it with a lit glass rim for the Glass and Clear materials. -->
+    <SolidColorBrush x:Key="IslandRimBrush" Color="#17FFFFFF"/>
 </ResourceDictionary>

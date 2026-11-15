@@ -57,12 +57,18 @@ public partial class SettingsWindow : Window
     public static void Show(Registry<SettingsSectionDescriptor> sections, GeneralSettings gs, string? sectionId)
     {
         if (sectionId == "updates") sectionId = "about"; // Older diagnostic links still reach update controls.
+        _material = gs.WindowMaterial;
         if (_instance is null)
         {
             var w = new SettingsWindow(sections);
-            PropertyChangedEventHandler onTheme = (_, e) => { if (e.PropertyName == nameof(GeneralSettings.Theme)) w.ApplyTitleBar(); };
+            PropertyChangedEventHandler onTheme = (_, e) =>
+            {
+                if (e.PropertyName == nameof(GeneralSettings.WindowMaterial)) { _material = gs.WindowMaterial; w.ApplyTitleBar(); }
+            };
+            Action onApplied = w.ApplyTitleBar; // theme, accent or Windows color changes
             gs.PropertyChanged += onTheme;
-            w.Closed += (_, _) => { gs.PropertyChanged -= onTheme; _instance = null; };
+            ThemeManager.Changed += onApplied;
+            w.Closed += (_, _) => { gs.PropertyChanged -= onTheme; ThemeManager.Changed -= onApplied; _instance = null; };
             _instance = w;
         }
         var win = _instance;
@@ -92,20 +98,11 @@ public partial class SettingsWindow : Window
             v.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140)) { FillBehavior = FillBehavior.Stop });
     }
 
-    /// <summary>Dark or light caption matching the theme (also re-applied when the theme changes).</summary>
-    void ApplyTitleBar()
-    {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        if (hwnd == 0) return;
-        int dark = ThemeManager.IsDark ? 1 : 0;
-        Native.DwmSetWindowAttribute(hwnd, 20, ref dark, 4); // DWMWA_USE_IMMERSIVE_DARK_MODE
-        if (FindResource("WindowBrush") is SolidColorBrush b)
-        {
-            int bgr = b.Color.R | (b.Color.G << 8) | (b.Color.B << 16);
-            Native.DwmSetWindowAttribute(hwnd, 35, ref bgr, 4); // caption color
-            Native.DwmSetWindowAttribute(hwnd, 34, ref bgr, 4); // border color
-        }
-    }
+    /// <summary>The material for the live window (General settings). Off-screen snapshots stay solid so their PNGs are opaque.</summary>
+    static WindowMaterial _material = WindowMaterial.Solid;
+
+    /// <summary>Backdrop, caption and border for the theme and material (Theme/Materials.cs); re-applied when either changes.</summary>
+    void ApplyTitleBar() => Materials.ApplyWindow(this, _noAnim ? WindowMaterial.Solid : _material);
 
     /// <summary>Snapshot tool: renders off-screen, through <paramref name="save"/>, every section <paramref name="wants"/> by id (and
     /// <c>&lt;id&gt;-end</c>, the bottom of a page taller than the window).</summary>

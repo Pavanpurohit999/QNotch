@@ -10,7 +10,7 @@
     <Grid x:Name="Root">
         <!-- Background shape: the ONLY thing animated per frame (size and corner radius). Hover and file-drag events come from here. -->
         <Border x:Name="Surface" AutomationProperties.AutomationId="pill" VerticalAlignment="Top" HorizontalAlignment="Center" Width="420" Height="38" AllowDrop="True"
-                Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource StrokeBrush}"
+                Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource IslandRimBrush}"
                 BorderThickness="1,0,1,1" CornerRadius="0,0,16,16" ClipToBounds="True" RenderTransformOrigin="0.5,0">
             <!-- Squash stretches the pill while it is flung sideways (NotchNudge); Shift moves it inside the window. -->
             <Border.RenderTransform>

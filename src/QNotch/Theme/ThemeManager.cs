@@ -11,6 +11,9 @@ public static class ThemeManager
     static bool? _dark;
     public static bool IsDark => _dark ?? true;
 
+    /// <summary>Raised after every Apply (theme, accent or system color change), so materials can re-derive their brushes.</summary>
+    public static event Action? Changed;
+
     public static void Apply(GeneralSettings gs)
     {
         var res = Application.Current.Resources;
@@ -33,6 +36,7 @@ public static class ThemeManager
         var onAccent = lum > 0.55 ? Color.FromRgb(0x0B, 0x0B, 0x0D) : Colors.White;
         res["OnAccentBrush"] = Frozen(onAccent);
         res["ToggleKnobOnBrush"] = Frozen(dark ? onAccent : Colors.White); // Windows 11: dark knob in dark mode, white in light
+        Changed?.Invoke();
     }
 
     /// <summary>The "mono" accent (default) follows the theme: near-white on dark, near-black on light. Anything else is a hex color.</summary>

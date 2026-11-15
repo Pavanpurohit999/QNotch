@@ -2,6 +2,10 @@ using System.Runtime.InteropServices;
 
 namespace QNotch.Interop;
 
+/// <summary>DwmExtendFrameIntoClientArea margins; -1 on every side extends the frame over the whole client area.</summary>
+[StructLayout(LayoutKind.Sequential)]
+public struct MARGINS { public int Left, Right, Top, Bottom; public MARGINS(int all) { Left = Right = Top = Bottom = all; } }
+
 [StructLayout(LayoutKind.Sequential)]
 public struct RECT
 {
@@ -150,6 +154,8 @@ public static unsafe partial class Native
 
     // DWM (dark title bar for the settings window)
     [LibraryImport("dwmapi.dll")] public static partial int DwmSetWindowAttribute(nint hwnd, int attr, ref int value, int size);
+    // DWM system backdrops (Theme/Materials.cs): the client area must be part of the frame for Mica or Acrylic to show through.
+    [LibraryImport("dwmapi.dll")] public static partial int DwmExtendFrameIntoClientArea(nint hwnd, ref MARGINS margins);
 
     public static string ClassNameOf(nint hwnd)
     {

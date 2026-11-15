@@ -17,6 +17,30 @@ var tests = new List<(string Name, Action Run)>
     ("Taildrop LocalAPI parsing, escaped paths, safe inbox names and set-if-changed state", TaildropChecks.Deterministic),
     ("Drop screen targets: File tray and Taildrop tiles, and the reasons a tile is off", DropChecks.Run),
     ("Small and Medium bodies fit live, empty, loading and error states", CardRenderingChecks.Run),
+    ("Materials: DWM backdrop types, simulated island brushes clamp opacity and freeze, settings round-trip", () =>
+    {
+        Require(QNotch.Theme.Materials.BackdropType(WindowMaterial.Solid) == 1 && QNotch.Theme.Materials.BackdropType(WindowMaterial.Mica) == 2
+            && QNotch.Theme.Materials.BackdropType(WindowMaterial.Acrylic) == 3 && QNotch.Theme.Materials.BackdropType(WindowMaterial.MicaAlt) == 4);
+        Require(QNotch.Theme.Materials.Effective(WindowMaterial.Acrylic) == (Environment.OSVersion.Version.Build >= 22621 ? WindowMaterial.Acrylic : WindowMaterial.Solid));
+        foreach (var dark in new[] { true, false })
+        foreach (var material in new[] { IslandMaterial.Glass, IslandMaterial.Clear })
+        {
+            var brushes = QNotch.Theme.Materials.IslandBrushes(material, 0.1, 5, dark).ToDictionary(b => b.Key, b => b.Brush);
+            Require(brushes.Keys.Order().SequenceEqual(new[] { "CardBrush", "CardHoverBrush", "IslandRimBrush", "SurfaceBrush" }));
+            Require(brushes.Values.All(b => b.IsFrozen)); // static, shareable, no per-frame work
+            var body = (System.Windows.Media.LinearGradientBrush)brushes["SurfaceBrush"];
+            Require(body.GradientStops.All(g => g.Color.A == 128)); // opacity 0.1 clamps to 50%: text stays readable
+            var opaque = (System.Windows.Media.LinearGradientBrush)QNotch.Theme.Materials.IslandBrushes(material, 3, 0.5, dark).First().Brush;
+            Require(opaque.GradientStops.All(g => g.Color.A == 255));
+        }
+        var gs = new GeneralSettings { WindowMaterial = WindowMaterial.Acrylic, IslandMaterial = IslandMaterial.Glass, IslandOpacity = 0.7, GlassHighlight = 0.3 };
+        var json = JsonSerializer.Serialize(gs, SettingsStore.Json);
+        Require(json.Contains("\"WindowMaterial\": \"Acrylic\"") && json.Contains("\"IslandMaterial\": \"Glass\""));
+        var back = JsonSerializer.Deserialize<GeneralSettings>(json, SettingsStore.Json)!;
+        Require(back.WindowMaterial == WindowMaterial.Acrylic && back.IslandMaterial == IslandMaterial.Glass && back.IslandOpacity == 0.7 && back.GlassHighlight == 0.3);
+        var defaults = new GeneralSettings();
+        Require(defaults.WindowMaterial == WindowMaterial.Mica && defaults.IslandMaterial == IslandMaterial.Solid);
+    }),
     ("Home sizes preserve defaults, reject unsupported choices and survive reload", () =>
     {
         var cards = new Registry<CardDescriptor>();
