@@ -10,7 +10,8 @@ namespace QNotch.Shell.Settings;
 
 public static class AppearanceSection
 {
-    static readonly string[] Accents = ["#CBA6F7", "#89B4FA", "#B4BEFE", "#F5C2E7", "#F38BA8", "#FAB387", "#A6E3A1", "#94E2D5"]; // Catppuccin Mocha accents
+    // Mono first (the default, follows the theme), then a few restrained colors.
+    static readonly string[] Accents = [ThemeManager.Mono, "#4C8DFF", "#2FB67C", "#F2A33A", "#F06A6A", "#E879A8", "#A78BFA", "#38BDB0"];
 
     public static FrameworkElement Create(GeneralSettings gs, CardLayout layout)
     {
@@ -40,8 +41,8 @@ public static class AppearanceSection
             var ring = new Border
             {
                 Width = 26, Height = 26, CornerRadius = new CornerRadius(13), BorderThickness = new Thickness(2), Margin = new Thickness(0, 0, 6, 0), Cursor = Cursors.Hand,
-                Background = Brushes.Transparent, ToolTip = h,
-                Child = new Border { CornerRadius = new CornerRadius(10), Margin = new Thickness(2), Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(h)) },
+                Background = Brushes.Transparent, ToolTip = h == ThemeManager.Mono ? "Mono" : h,
+                Child = new Border { CornerRadius = new CornerRadius(10), Margin = new Thickness(2), Background = Swatch(h) },
             };
             ring.MouseEnter += (_, _) => { if (!string.Equals(h, gs.AccentColor, StringComparison.OrdinalIgnoreCase)) ring.SetResourceReference(Border.BorderBrushProperty, "StrokeStrongBrush"); };
             ring.MouseLeave += (_, _) => Mark();
@@ -85,5 +86,16 @@ public static class AppearanceSection
         }
         page.Children.Add(cards);
         return page;
+    }
+
+    /// <summary>A swatch fill: the hex color, or for Mono a diagonal half white, half black.</summary>
+    static Brush Swatch(string value)
+    {
+        if (value != ThemeManager.Mono) return new SolidColorBrush((Color)ColorConverter.ConvertFromString(value));
+        var b = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
+        b.GradientStops.Add(new GradientStop(Color.FromRgb(0xF4, 0xF4, 0xF5), 0.5));
+        b.GradientStops.Add(new GradientStop(Color.FromRgb(0x1C, 0x1C, 0x1E), 0.5));
+        b.Freeze();
+        return b;
     }
 }

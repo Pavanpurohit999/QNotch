@@ -18,5 +18,5 @@ Orbit Desk changes from upstream (summary; see CHANGELOG.md):
 - Product renamed to Orbit Desk; separate data folder (`%APPDATA%\OrbitDesk`), mutex, pipes and autostart entry, so it can run beside QNotch.
 - Usage analytics removed (no key shipped) and off by default.
 - Update checks never contact upstream QNotch releases; disabled until `Brand.UpdateRepository` names your own repo.
-- Catppuccin Mocha (dark) / Latte (light) palettes and Mauve accent by default.
+- Neutral "island" palettes (pure black notch in dark mode, neutral greys in light) and a monochrome "Mono" accent by default.
 - macOS port, website and founder material removed (Windows-only fork).

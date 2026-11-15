@@ -12,7 +12,7 @@
 1. Telemetry on by default (PostHog) -> **removed, off** (done).
 2. Updater pulls upstream QNotch releases -> **disabled until own repo** (done).
 3. Phone transfer is plain HTTP + 128-bit token, 15-min session -> add AES-256-GCM in-page encryption with key in the QR `#fragment`, explicit incoming-file approval, size limits (planned; WebCrypto is unavailable on plain-HTTP LAN origins, so a bundled audited JS AES-GCM is needed).
-4. Catppuccin theme (done), Inter + JetBrains Mono Nerd Font (planned, fonts are OFL).
+4. Neutral island theme with Mono accent (done, replaced the earlier Catppuccin palette), Inter + JetBrains Mono Nerd Font (planned, fonts are OFL).
 5. Missing modules: Notes as SQLite with tasks/due dates/import-export; stopwatch/countdown/reminders; DPAPI-encrypted opt-in clipboard persistence (verify); presentation mode; floating dock; desktop widget framework; Windows UserNotificationListener integration.
 6. Packaging: per-user Inno Setup installer (no admin), portable zip, scripts/ (build, test, publish, diagnose, backup, restore), documentation/.
 7. Terminal environment: WezTerm Lua config, PowerShell 7 profile, Starship etc. (separate from the app).

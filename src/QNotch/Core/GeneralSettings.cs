@@ -16,7 +16,7 @@ public sealed partial class GeneralSettings : ObservableObject
     // Only the defaults of the "toggle" and "gamemode" shortcuts now (a value saved here before hotkeys.json existed still counts).
     [ObservableProperty] string _toggleHotkey = "Ctrl+Alt+N";
     [ObservableProperty] string _gameModeHotkey = "Ctrl+Alt+G";
-    [ObservableProperty] string _accentColor = "#CBA6F7"; // Catppuccin Mauve
+    [ObservableProperty] string _accentColor = "mono"; // ThemeManager.Mono: follows the theme (white on dark, black on light)
     [ObservableProperty] ThemeChoice _theme = ThemeChoice.System;
     [ObservableProperty] bool _reduceMotion;
     [ObservableProperty] string _profileName = Environment.UserName;
